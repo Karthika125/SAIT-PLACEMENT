@@ -19,13 +19,14 @@ const CompanyAuth = () => {
   const [error, setError] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    companyName: '',
-    password: '',
+    company_name: '',
     industry: '',
-    jobRequirements: 'Not specified',
-    jobDescription: 'Not specified',
-    location: 'Not specified',
-    salaryRange: 'Not specified'
+    job_requirements: '',
+    job_description: '',
+    location: '',
+    salary_range: '',
+    email: '',
+    phone: ''
   });
 
   const handleChange = (e) => {
@@ -42,60 +43,79 @@ const CompanyAuth = () => {
 
     try {
       if (isLogin) {
-        // Login - first find the company
-        const { data: companyData, error: companyError } = await supabase
+        // Login - check if company exists
+        const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('*')
-          .eq('company_name', formData.companyName)
-          .single();
+          .eq('company_name', formData.company_name)
+          .maybeSingle();
 
         if (companyError) {
-          console.error('Company lookup error:', companyError);
-          throw new Error('Company not found. Please check your company name.');
+          console.error('Login error:', companyError);
+          throw new Error('Error checking company. Please try again.');
         }
 
-        // Check password (you'll need to implement proper password hashing in production)
-        if (formData.password !== companyData.password) {
-          throw new Error('Invalid password');
+        if (!company) {
+          throw new Error('Company not found. Please check your company name or register as a new company.');
         }
 
-        navigate('/company/dashboard');
-      } else {
-        // Register
-        console.log('Starting company registration...');
+        // Store company info in localStorage for persistence
+        localStorage.setItem('companyData', JSON.stringify(company));
         
-        // Check if company already exists
+        // Force navigation after setting localStorage
+        window.location.href = '/company/dashboard';
+        return;
+      } else {
+        // Validate required fields
+        if (!formData.company_name || !formData.industry) {
+          throw new Error('Company name and industry are required');
+        }
+
+        // Register - first check if company already exists
         const { data: existingCompany, error: checkError } = await supabase
           .from('companies')
           .select('company_name')
-          .eq('company_name', formData.companyName)
-          .single();
+          .eq('company_name', formData.company_name)
+          .maybeSingle();
 
-        if (existingCompany) {
-          throw new Error('Company already registered');
+        if (checkError) {
+          console.error('Check error:', checkError);
+          throw new Error('Error checking company. Please try again.');
         }
 
-        // Create new company
-        const { error: insertError } = await supabase
+        if (existingCompany) {
+          throw new Error('Company already registered. Please use the login option.');
+        }
+
+        // Create new company profile
+        const { data: newCompany, error: insertError } = await supabase
           .from('companies')
           .insert([{
-            company_name: formData.companyName,
-            password: formData.password, // In production, hash this password
+            company_name: formData.company_name,
             industry: formData.industry,
-            job_requirements: formData.jobRequirements,
-            job_description: formData.jobDescription,
-            location: formData.location,
-            salary_range: formData.salaryRange,
-            verified: false
-          }]);
+            job_requirements: formData.job_requirements || null,
+            job_description: formData.job_description || null,
+            location: formData.location || null,
+            salary_range: formData.salary_range || null,
+            email: formData.email || null,
+            phone: formData.phone || null,
+            verified: true
+          }])
+          .select()
+          .single();
 
         if (insertError) {
           console.error('Company creation error:', insertError);
-          throw insertError;
+          throw new Error('Error creating company profile. Please try again.');
         }
 
-        alert('Registration successful! Please wait for admin verification.');
-        setIsLogin(true);
+        if (!newCompany) {
+          throw new Error('Failed to create company profile. Please try again.');
+        }
+
+        // Store company info in localStorage
+        localStorage.setItem('companyData', JSON.stringify(newCompany));
+        navigate('/company/dashboard');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -106,129 +126,125 @@ const CompanyAuth = () => {
   };
 
   return (
-    <Container component="main" maxWidth="sm">
-      <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
           <Typography component="h1" variant="h5" align="center" gutterBottom>
-            {isLogin ? 'Company Login' : 'Company Registration'}
+            {isLogin ? 'Company Login' : 'Register Company'}
           </Typography>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              label="Company Name"
+              name="company_name"
+              value={formData.company_name}
+              onChange={handleChange}
+              autoFocus
+            />
+
+            {!isLogin && (
+              <>
                 <TextField
+                  margin="normal"
                   required
                   fullWidth
-                  label="Company Name"
-                  name="companyName"
-                  value={formData.companyName}
+                  label="Industry"
+                  name="industry"
+                  value={formData.industry}
                   onChange={handleChange}
-                  helperText="Enter your registered company name"
                 />
-              </Grid>
-              
-              <Grid item xs={12}>
                 <TextField
-                  required
+                  margin="normal"
                   fullWidth
-                  label="Password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
                   onChange={handleChange}
                 />
-              </Grid>
-
-              {!isLogin && (
-                <>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Industry"
-                      name="industry"
-                      value={formData.industry}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Job Requirements"
-                      name="jobRequirements"
-                      value={formData.jobRequirements}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Job Description"
-                      name="jobDescription"
-                      value={formData.jobDescription}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Salary Range"
-                      name="salaryRange"
-                      value={formData.salaryRange}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                </>
-              )}
-
-              <Grid item xs={12}>
-                <Button
-                  type="submit"
+                <TextField
+                  margin="normal"
                   fullWidth
-                  variant="contained"
-                  disabled={loading}
+                  label="Phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  fullWidth
+                  label="Location"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  fullWidth
+                  label="Salary Range"
+                  name="salary_range"
+                  value={formData.salary_range}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Job Requirements"
+                  name="job_requirements"
+                  value={formData.job_requirements}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Job Description"
+                  name="job_description"
+                  value={formData.job_description}
+                  onChange={handleChange}
+                />
+              </>
+            )}
+
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              sx={{ mt: 3, mb: 2 }}
+              disabled={loading}
+            >
+              {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
+            </Button>
+
+            <Grid container justifyContent="center">
+              <Grid item>
+                <Link
+                  component="button"
+                  variant="body2"
+                  onClick={() => {
+                    setIsLogin(!isLogin);
+                    setError('');
+                  }}
                 >
-                  {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Register')}
-                </Button>
+                  {isLogin ? "New company? Register here" : "Already registered? Login"}
+                </Link>
               </Grid>
             </Grid>
-          </form>
-
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Button
-              color="primary"
-              onClick={() => setIsLogin(!isLogin)}
-            >
-              {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
-            </Button>
-            <Box sx={{ mt: 1 }}>
-              <Link
-                component="button"
-                variant="body2"
-                onClick={() => navigate('/')}
-              >
-                Back to Student Login
-              </Link>
-            </Box>
           </Box>
         </Paper>
       </Box>

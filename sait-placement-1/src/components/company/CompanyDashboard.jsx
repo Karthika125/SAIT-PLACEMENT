@@ -29,10 +29,13 @@ import AddIcon from '@mui/icons-material/Add';
 import BusinessIcon from '@mui/icons-material/Business';
 import WorkIcon from '@mui/icons-material/Work';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { useNavigate } from 'react-router-dom';
 import { dashboardStyles } from '../../styles/dashboardStyles';
 import { supabase } from '../../config/supabaseClient';
 
 const CompanyDashboard = () => {
+  const navigate = useNavigate();
   const [jobPostings, setJobPostings] = useState([]);
   const [applications, setApplications] = useState([]);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
@@ -40,10 +43,10 @@ const CompanyDashboard = () => {
   const [companyProfile, setCompanyProfile] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [viewProfileDialog, setViewProfileDialog] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedProfile, setEditedProfile] = useState({});
 
   const [newPosting, setNewPosting] = useState({
-    company_name: '',
-    industry: '',
     job_requirements: '',
     job_description: '',
     location: '',
@@ -51,352 +54,326 @@ const CompanyDashboard = () => {
   });
 
   useEffect(() => {
-    loadCompanyData();
-  }, []);
+    const companyData = JSON.parse(localStorage.getItem('companyData'));
+    if (!companyData) {
+      navigate('/company/auth');
+      return;
+    }
 
-  const loadCompanyData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Load company profile
-      const { data: company } = await supabase
-        .from('companies')
-        .select('company_name, industry, auth_id, verified, created_at')
-        .eq('auth_id', user.id)
-        .single();
-
-      setCompanyProfile(company);
-
-      if (company) {
-        // Load job postings
-        const { data: jobs } = await supabase
+    const loadCompanyData = async () => {
+      try {
+        // Get latest company data
+        const { data: company, error } = await supabase
           .from('companies')
-          .select('company_name, industry, job_requirements, job_description, location, salary_range, created_at')
-          .eq('auth_id', user.id);
+          .select('*')
+          .eq('company_name', companyData.company_name)
+          .single();
+
+        if (error) throw error;
+        setCompanyProfile(company);
+        setEditedProfile(company);
+
+        // Get job postings
+        const { data: jobs, error: jobsError } = await supabase
+          .from('job_postings')
+          .select('*')
+          .eq('company_name', company.company_name);
+
+        if (jobsError) throw jobsError;
         setJobPostings(jobs || []);
 
-        // Load applications
-        const { data: apps } = await supabase
-          .from('job_applications')
-          .select(`
-            id,
-            status,
-            applied_at,
-            students (
-              student_id,
-              full_name,
-              email,
-              department,
-              year_of_study,
-              cgpa,
-              skills,
-              resume_url
-            )
-          `)
-          .eq('company_id', company.id);
+        // Get applications
+        const { data: apps, error: appsError } = await supabase
+          .from('applications')
+          .select('*, students(*)')
+          .eq('company_name', company.company_name);
+
+        if (appsError) throw appsError;
         setApplications(apps || []);
+      } catch (error) {
+        console.error('Error loading company data:', error);
+        setNotification({
+          open: true,
+          message: 'Error loading company data',
+          severity: 'error'
+        });
       }
-    } catch (error) {
-      console.error('Error loading company data:', error);
+    };
+
+    loadCompanyData();
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('companyData');
+    navigate('/company/auth');
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update(editedProfile)
+        .eq('company_name', companyProfile.company_name);
+
+      if (error) throw error;
+
+      setCompanyProfile(editedProfile);
+      setIsEditMode(false);
       setNotification({
         open: true,
-        message: 'Failed to load company data',
+        message: 'Profile updated successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setNotification({
+        open: true,
+        message: 'Error updating profile',
         severity: 'error'
       });
     }
   };
 
-  const handleNewPosting = (e) => {
-    setNewPosting({
-      ...newPosting,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmitPosting = async (e) => {
-    e.preventDefault();
+  const handleCreateJob = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('companies')
+      const { error } = await supabase
+        .from('job_postings')
         .insert({
           ...newPosting,
-          auth_id: user.id
-        })
-        .select()
-        .single();
-      
+          company_name: companyProfile.company_name,
+          posting_date: new Date().toISOString()
+        });
+
       if (error) throw error;
-      
-      setJobPostings([...jobPostings, data]);
+
+      // Refresh job postings
+      const { data: jobs } = await supabase
+        .from('job_postings')
+        .select('*')
+        .eq('company_name', companyProfile.company_name);
+
+      setJobPostings(jobs);
       setNewPosting({
-        company_name: '',
-        industry: '',
         job_requirements: '',
         job_description: '',
         location: '',
         salary_range: ''
       });
-      
+
       setNotification({
         open: true,
-        message: 'Job posting created successfully!',
+        message: 'Job posted successfully',
         severity: 'success'
       });
     } catch (error) {
+      console.error('Error creating job:', error);
       setNotification({
         open: true,
-        message: error.message || 'Failed to create job posting',
+        message: 'Error creating job posting',
         severity: 'error'
       });
     }
   };
 
-  const handleViewProfile = (student) => {
+  const handleViewStudentProfile = (student) => {
     setSelectedStudent(student);
     setViewProfileDialog(true);
   };
 
-  const handleUpdateStatus = async (applicationId, newStatus) => {
-    try {
-      const { error } = await supabase
-        .from('job_applications')
-        .update({ status: newStatus })
-        .eq('id', applicationId);
-
-      if (error) throw error;
-
-      setApplications(applications.map(app => 
-        app.id === applicationId ? { ...app, status: newStatus } : app
-      ));
-
-      setNotification({
-        open: true,
-        message: 'Application status updated successfully',
-        severity: 'success'
-      });
-    } catch (error) {
-      setNotification({
-        open: true,
-        message: 'Failed to update application status',
-        severity: 'error'
-      });
-    }
-  };
-
-  const handleCloseNotification = () => {
-    setNotification({ ...notification, open: false });
-  };
-
   return (
-    <Box sx={dashboardStyles.root}>
-      <AppBar position="static" color="default" sx={dashboardStyles.header}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <AppBar position="static">
         <Toolbar>
-          <BusinessIcon sx={{ mr: 2, color: 'primary.main' }} />
+          <BusinessIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Company Dashboard
+            {companyProfile?.company_name || 'Company Dashboard'}
           </Typography>
-          <IconButton color="inherit">
-            <AccountCircleIcon />
+          <IconButton color="inherit" onClick={handleLogout}>
+            <LogoutIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={dashboardStyles.mainContent}>
-        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ mb: 3 }}>
-          <Tab label="Job Postings" />
-          <Tab label="Applications" />
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
+        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} centered>
+          <Tab icon={<BusinessIcon />} label="Company Profile" />
+          <Tab icon={<WorkIcon />} label="Job Postings" />
+          <Tab icon={<AccountCircleIcon />} label="Applications" />
         </Tabs>
 
+        {/* Company Profile Tab */}
         {activeTab === 0 && (
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Post New Job
-                </Typography>
-                <form onSubmit={handleSubmitPosting}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        required
-                        fullWidth
-                        label="Company Name"
-                        name="company_name"
-                        value={newPosting.company_name}
-                        onChange={handleNewPosting}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        required
-                        fullWidth
-                        label="Industry"
-                        name="industry"
-                        value={newPosting.industry}
-                        onChange={handleNewPosting}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        required
-                        fullWidth
-                        multiline
-                        rows={3}
-                        label="Job Requirements"
-                        name="job_requirements"
-                        value={newPosting.job_requirements}
-                        onChange={handleNewPosting}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TextField
-                        required
-                        fullWidth
-                        multiline
-                        rows={3}
-                        label="Job Description"
-                        name="job_description"
-                        value={newPosting.job_description}
-                        onChange={handleNewPosting}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        required
-                        fullWidth
-                        label="Location"
-                        name="location"
-                        value={newPosting.location}
-                        onChange={handleNewPosting}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        required
-                        fullWidth
-                        label="Salary Range"
-                        name="salary_range"
-                        value={newPosting.salary_range}
-                        onChange={handleNewPosting}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                      >
-                        Post Job
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </form>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>
-                Your Job Postings
-              </Typography>
-              <Grid container spacing={2}>
-                {jobPostings.map((job) => (
-                  <Grid item xs={12} md={6} key={job.id}>
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6">{job.company_name}</Typography>
-                        <Typography color="textSecondary" gutterBottom>
-                          {job.industry}
-                        </Typography>
-                        <Typography variant="body2" paragraph>
-                          <strong>Requirements:</strong> {job.job_requirements}
-                        </Typography>
-                        <Typography variant="body2" paragraph>
-                          <strong>Description:</strong> {job.job_description}
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>Location:</strong> {job.location}
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>Salary Range:</strong> {job.salary_range}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
+          <Paper sx={{ p: 3, mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h5">Company Profile</Typography>
+              <Button
+                variant="outlined"
+                onClick={() => isEditMode ? handleUpdateProfile() : setIsEditMode(true)}
+              >
+                {isEditMode ? 'Save Changes' : 'Edit Profile'}
+              </Button>
+            </Box>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Company Name"
+                  value={isEditMode ? editedProfile.company_name : companyProfile?.company_name}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, company_name: e.target.value })}
+                  disabled={!isEditMode}
+                  margin="normal"
+                />
+                <TextField
+                  fullWidth
+                  label="Industry"
+                  value={isEditMode ? editedProfile.industry : companyProfile?.industry}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, industry: e.target.value })}
+                  disabled={!isEditMode}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Location"
+                  value={isEditMode ? editedProfile.location : companyProfile?.location}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, location: e.target.value })}
+                  disabled={!isEditMode}
+                  margin="normal"
+                />
+                <TextField
+                  fullWidth
+                  label="Salary Range"
+                  value={isEditMode ? editedProfile.salary_range : companyProfile?.salary_range}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, salary_range: e.target.value })}
+                  disabled={!isEditMode}
+                  margin="normal"
+                />
               </Grid>
             </Grid>
-          </Grid>
+          </Paper>
         )}
 
+        {/* Job Postings Tab */}
         {activeTab === 1 && (
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>
-                Applications Received
-              </Typography>
+          <Box sx={{ mt: 3 }}>
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>Create New Job Posting</Typography>
               <Grid container spacing={2}>
-                {applications.map((application) => (
-                  <Grid item xs={12} md={6} key={application.id}>
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6">
-                          {application.students.full_name}
-                        </Typography>
-                        <Typography color="textSecondary" gutterBottom>
-                          {application.students.department} - Year {application.students.year_of_study}
-                        </Typography>
-                        <Typography variant="body2">
-                          CGPA: {application.students.cgpa}
-                        </Typography>
-                        <Box sx={{ mt: 1, mb: 2 }}>
-                          {application.students.skills.map((skill, index) => (
-                            <Chip
-                              key={index}
-                              label={skill}
-                              size="small"
-                              sx={{ mr: 0.5, mb: 0.5 }}
-                            />
-                          ))}
-                        </Box>
-                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
-                          <Button
-                            variant="outlined"
-                            onClick={() => handleViewProfile(application.students)}
-                          >
-                            View Full Profile
-                          </Button>
-                          <Box>
-                            <Button
-                              color="success"
-                              variant={application.status === 'accepted' ? 'contained' : 'outlined'}
-                              onClick={() => handleUpdateStatus(application.id, 'accepted')}
-                              sx={{ mr: 1 }}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              color="error"
-                              variant={application.status === 'rejected' ? 'contained' : 'outlined'}
-                              onClick={() => handleUpdateStatus(application.id, 'rejected')}
-                            >
-                              Reject
-                            </Button>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Job Requirements"
+                    multiline
+                    rows={3}
+                    value={newPosting.job_requirements}
+                    onChange={(e) => setNewPosting({ ...newPosting, job_requirements: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Job Description"
+                    multiline
+                    rows={3}
+                    value={newPosting.job_description}
+                    onChange={(e) => setNewPosting({ ...newPosting, job_description: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Location"
+                    value={newPosting.location}
+                    onChange={(e) => setNewPosting({ ...newPosting, location: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Salary Range"
+                    value={newPosting.salary_range}
+                    onChange={(e) => setNewPosting({ ...newPosting, salary_range: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleCreateJob}
+                    fullWidth
+                  >
+                    Post Job
+                  </Button>
+                </Grid>
               </Grid>
+            </Paper>
+
+            <Typography variant="h6" gutterBottom>Current Job Postings</Typography>
+            <Grid container spacing={3}>
+              {jobPostings.map((job) => (
+                <Grid item xs={12} md={6} key={job.id}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Job Requirements
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" paragraph>
+                        {job.job_requirements}
+                      </Typography>
+                      <Typography variant="h6" gutterBottom>
+                        Job Description
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" paragraph>
+                        {job.job_description}
+                      </Typography>
+                      <Box sx={{ mt: 2 }}>
+                        <Chip label={`Location: ${job.location}`} sx={{ mr: 1 }} />
+                        <Chip label={`Salary: ${job.salary_range}`} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          </Grid>
+          </Box>
+        )}
+
+        {/* Applications Tab */}
+        {activeTab === 2 && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>Student Applications</Typography>
+            <List>
+              {applications.map((application) => (
+                <React.Fragment key={application.id}>
+                  <ListItem>
+                    <Box sx={{ width: '100%' }}>
+                      <Typography variant="subtitle1">
+                        {application.students?.full_name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Department: {application.students?.department}
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleViewStudentProfile(application.students)}
+                        >
+                          View Profile
+                        </Button>
+                      </Box>
+                    </Box>
+                  </ListItem>
+                  <Divider />
+                </React.Fragment>
+              ))}
+            </List>
+          </Box>
         )}
       </Container>
 
+      {/* Student Profile Dialog */}
       <Dialog
         open={viewProfileDialog}
         onClose={() => setViewProfileDialog(false)}
@@ -409,26 +386,18 @@ const CompanyDashboard = () => {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Typography variant="h6">{selectedStudent.full_name}</Typography>
-                <Typography color="textSecondary">{selectedStudent.email}</Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography><strong>Department:</strong> {selectedStudent.department}</Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography><strong>Year:</strong> {selectedStudent.year_of_study}</Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography><strong>CGPA:</strong> {selectedStudent.cgpa}</Typography>
+                <Typography><strong>Year of Study:</strong> {selectedStudent.year_of_study}</Typography>
               </Grid>
               <Grid item xs={12}>
                 <Typography><strong>Skills:</strong></Typography>
                 <Box sx={{ mt: 1 }}>
-                  {selectedStudent.skills.map((skill, index) => (
-                    <Chip
-                      key={index}
-                      label={skill}
-                      sx={{ mr: 0.5, mb: 0.5 }}
-                    />
+                  {selectedStudent.skills?.map((skill, index) => (
+                    <Chip key={index} label={skill} sx={{ m: 0.5 }} />
                   ))}
                 </Box>
               </Grid>
@@ -438,6 +407,7 @@ const CompanyDashboard = () => {
                     variant="contained"
                     href={selectedStudent.resume_url}
                     target="_blank"
+                    rel="noopener noreferrer"
                   >
                     View Resume
                   </Button>
@@ -454,10 +424,10 @@ const CompanyDashboard = () => {
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}
-        onClose={handleCloseNotification}
+        onClose={() => setNotification({ ...notification, open: false })}
       >
         <Alert
-          onClose={handleCloseNotification}
+          onClose={() => setNotification({ ...notification, open: false })}
           severity={notification.severity}
           sx={{ width: '100%' }}
         >

@@ -12,20 +12,27 @@ import {
   ToggleButton
 } from '@mui/material';
 import { supabase } from '../../config/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { authStyles } from '../../styles/authStyles';
 
 const StudentAuth = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isLogin, setIsLogin] = useState(true);
   const [userType, setUserType] = useState('student');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    fullName: '',
-    studentId: '',
   });
+
+  const handleUserTypeChange = (event, newType) => {
+    if (newType !== null) {
+      setUserType(newType);
+      if (newType === 'company') {
+        navigate('/company/auth');
+      }
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -34,76 +41,36 @@ const StudentAuth = () => {
     });
   };
 
-  const handleUserTypeChange = (event, newType) => {
-    if (newType !== null) {
-      setUserType(newType);
-      setError('');
-      if (newType === 'company') {
-        navigate('/company/auth');
-      }
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      if (isLogin) {
-        // Login
-        const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
 
-        if (signInError) {
-          console.error('Login error:', signInError);
-          throw signInError;
-        }
-
-        // Check if user is a student
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('email', formData.email)
-          .single();
-
-        if (studentError) {
-          console.error('Student lookup error:', studentError);
-          throw new Error('Student account not found');
-        }
-
-        console.log('Student login successful:', { authData, studentData });
-        navigate('/student/dashboard');
-      } else {
-        // Register student
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (signUpError) {
-          console.error('Registration error:', signUpError);
-          throw signUpError;
-        }
-
-        const { error: profileError } = await supabase
-          .from('students')
-          .insert({
-            student_id: formData.studentId,
-            email: formData.email,
-            full_name: formData.fullName
-          });
-
-        if (profileError) {
-          console.error('Student profile creation error:', profileError);
-          throw profileError;
-        }
-
-        alert('Registration successful! Please verify your email.');
-        setIsLogin(true);
+      if (signInError) {
+        console.error('Login error:', signInError);
+        throw signInError;
       }
+
+      // Check if user is a student
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('*')
+        .eq('email', formData.email)
+        .single();
+
+      if (studentError) {
+        console.error('Student lookup error:', studentError);
+        throw new Error('Student account not found');
+      }
+
+      console.log('Student login successful:', { authData, studentData });
+      navigate('/student/dashboard');
     } catch (error) {
       console.error('Error:', error);
       setError(error.message);
@@ -113,46 +80,42 @@ const StudentAuth = () => {
   };
 
   return (
-    <Container component="main" maxWidth="sm">
-      <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            SAIT Placement Portal
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: 'background.default' }}>
+      <Container component="main" maxWidth="xs">
+        <Paper elevation={3} sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Typography component="h1" variant="h5" gutterBottom>
+            Welcome Back
           </Typography>
 
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
-            <ToggleButtonGroup
-              value={userType}
-              exclusive
-              onChange={handleUserTypeChange}
-              aria-label="user type"
-            >
-              <ToggleButton value="student" aria-label="student">
-                Student
-              </ToggleButton>
-              <ToggleButton value="company" aria-label="company">
-                Company
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
+          <ToggleButtonGroup
+            color="primary"
+            value={userType}
+            exclusive
+            onChange={handleUserTypeChange}
+            sx={{ mb: 3 }}
+          >
+            <ToggleButton value="student">Student</ToggleButton>
+            <ToggleButton value="company">Company</ToggleButton>
+          </ToggleButtonGroup>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
               {error}
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
                   required
                   fullWidth
-                  label="Email Address"
+                  label="Email"
                   name="email"
                   type="email"
                   value={formData.email}
                   onChange={handleChange}
+                  autoComplete="email"
                 />
               </Grid>
               <Grid item xs={12}>
@@ -164,58 +127,39 @@ const StudentAuth = () => {
                   type="password"
                   value={formData.password}
                   onChange={handleChange}
+                  autoComplete="current-password"
                 />
               </Grid>
-
-              {!isLogin && (
-                <>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Full Name"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Student ID"
-                      name="studentId"
-                      value={formData.studentId}
-                      onChange={handleChange}
-                    />
-                  </Grid>
-                </>
-              )}
-
-              <Grid item xs={12}>
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  disabled={loading}
-                >
-                  {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Register')}
-                </Button>
-              </Grid>
             </Grid>
-          </form>
 
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
             <Button
-              color="primary"
-              onClick={() => setIsLogin(!isLogin)}
+              type="submit"
+              fullWidth
+              variant="contained"
+              disabled={loading}
+              sx={{ mt: 3, mb: 2 }}
             >
-              {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
+
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <Link 
+                to="/register" 
+                style={{ 
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                  '&:hover': {
+                    textDecoration: 'underline'
+                  }
+                }}
+              >
+                Don't have an account? Register
+              </Link>
+            </Box>
           </Box>
         </Paper>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 
