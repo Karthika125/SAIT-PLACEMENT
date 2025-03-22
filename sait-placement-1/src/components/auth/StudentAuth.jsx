@@ -25,8 +25,6 @@ const StudentAuth = () => {
     password: '',
     fullName: '',
     studentId: '',
-    companyName: '',
-    industry: ''
   });
 
   const handleChange = (e) => {
@@ -40,6 +38,9 @@ const StudentAuth = () => {
     if (newType !== null) {
       setUserType(newType);
       setError('');
+      if (newType === 'company') {
+        navigate('/company/auth');
+      }
     }
   };
 
@@ -51,50 +52,32 @@ const StudentAuth = () => {
     try {
       if (isLogin) {
         // Login
-        console.log('Attempting login...');
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
 
-        if (error) {
-          console.error('Login error:', error);
-          throw error;
+        if (signInError) {
+          console.error('Login error:', signInError);
+          throw signInError;
         }
 
-        console.log('Login successful:', data);
+        // Check if user is a student
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('email', formData.email)
+          .single();
 
-        // Check user type in database
-        if (userType === 'student') {
-          const { data: studentData, error: studentError } = await supabase
-            .from('students')
-            .select('*')
-            .eq('email', formData.email)
-            .single();
-            
-          if (studentError) {
-            console.error('Student profile error:', studentError);
-            throw new Error('Error accessing student profile');
-          }
-          
-          navigate('/student/dashboard');
-        } else {
-          const { data: companyData, error: companyError } = await supabase
-            .from('companies')
-            .select('*')
-            .eq('email', formData.email)
-            .single();
-            
-          if (companyError) {
-            console.error('Company profile error:', companyError);
-            throw new Error('Error accessing company profile');
-          }
-          
-          navigate('/company/dashboard');
+        if (studentError) {
+          console.error('Student lookup error:', studentError);
+          throw new Error('Student account not found');
         }
+
+        console.log('Student login successful:', { authData, studentData });
+        navigate('/student/dashboard');
       } else {
-        // Register
-        console.log('Attempting registration...');
+        // Register student
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
@@ -105,45 +88,25 @@ const StudentAuth = () => {
           throw signUpError;
         }
 
-        if (userType === 'student') {
-          const { error: profileError } = await supabase
-            .from('students')
-            .insert({
-              student_id: formData.studentId,
-              email: formData.email,
-              full_name: formData.fullName
-            });
+        const { error: profileError } = await supabase
+          .from('students')
+          .insert({
+            student_id: formData.studentId,
+            email: formData.email,
+            full_name: formData.fullName
+          });
 
-          if (profileError) {
-            console.error('Student profile creation error:', profileError);
-            throw profileError;
-          }
-          alert('Registration successful! Please verify your email.');
-        } else {
-          const { error: profileError } = await supabase
-            .from('companies')
-            .insert({
-              email: formData.email,
-              company_name: formData.companyName,
-              industry: formData.industry,
-              verified: false
-            });
-
-          if (profileError) {
-            console.error('Company profile creation error:', profileError);
-            throw profileError;
-          }
-          alert('Registration successful! Please wait for admin verification.');
+        if (profileError) {
+          console.error('Student profile creation error:', profileError);
+          throw profileError;
         }
+
+        alert('Registration successful! Please verify your email.');
         setIsLogin(true);
       }
     } catch (error) {
-      console.error('Authentication error:', error);
-      if (error.message === 'Failed to fetch') {
-        setError('Network error. Please check your internet connection.');
-      } else {
-        setError(error.message || 'An error occurred during authentication');
-      }
+      console.error('Error:', error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -151,14 +114,7 @@ const StudentAuth = () => {
 
   return (
     <Container component="main" maxWidth="sm">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
+      <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
           <Typography component="h1" variant="h5" align="center" gutterBottom>
             SAIT Placement Portal
@@ -213,53 +169,26 @@ const StudentAuth = () => {
 
               {!isLogin && (
                 <>
-                  {userType === 'student' ? (
-                    <>
-                      <Grid item xs={12}>
-                        <TextField
-                          required
-                          fullWidth
-                          label="Full Name"
-                          name="fullName"
-                          value={formData.fullName}
-                          onChange={handleChange}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          required
-                          fullWidth
-                          label="Student ID"
-                          name="studentId"
-                          value={formData.studentId}
-                          onChange={handleChange}
-                        />
-                      </Grid>
-                    </>
-                  ) : (
-                    <>
-                      <Grid item xs={12}>
-                        <TextField
-                          required
-                          fullWidth
-                          label="Company Name"
-                          name="companyName"
-                          value={formData.companyName}
-                          onChange={handleChange}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <TextField
-                          required
-                          fullWidth
-                          label="Industry"
-                          name="industry"
-                          value={formData.industry}
-                          onChange={handleChange}
-                        />
-                      </Grid>
-                    </>
-                  )}
+                  <Grid item xs={12}>
+                    <TextField
+                      required
+                      fullWidth
+                      label="Full Name"
+                      name="fullName"
+                      value={formData.fullName}
+                      onChange={handleChange}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      required
+                      fullWidth
+                      label="Student ID"
+                      name="studentId"
+                      value={formData.studentId}
+                      onChange={handleChange}
+                    />
+                  </Grid>
                 </>
               )}
 
@@ -270,11 +199,7 @@ const StudentAuth = () => {
                   variant="contained"
                   disabled={loading}
                 >
-                  {loading
-                    ? 'Please wait...'
-                    : isLogin
-                    ? 'Sign In'
-                    : 'Register'}
+                  {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Register')}
                 </Button>
               </Grid>
             </Grid>
@@ -285,9 +210,7 @@ const StudentAuth = () => {
               color="primary"
               onClick={() => setIsLogin(!isLogin)}
             >
-              {isLogin
-                ? "Don't have an account? Register"
-                : 'Already have an account? Sign In'}
+              {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
             </Button>
           </Box>
         </Paper>

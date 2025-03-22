@@ -1,15 +1,32 @@
 import { createClient } from '@supabase/supabase-js'
+import { SUPABASE_CONFIG } from './env'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = SUPABASE_CONFIG.url
+const supabaseAnonKey = SUPABASE_CONFIG.anonKey
+
+console.log('Supabase config:', {
+  url: supabaseUrl,
+  keyLength: supabaseAnonKey?.length
+})
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Check .env.local file')
+  console.error('Missing config:', { supabaseUrl, supabaseAnonKey })
+  throw new Error('Missing Supabase configuration')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true
-  }
-})
+let supabase
+
+try {
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true
+    }
+  })
+} catch (error) {
+  console.error('Supabase initialization error:', error)
+  console.error('URL used:', supabaseUrl)
+  throw error
+}
+
+export { supabase }

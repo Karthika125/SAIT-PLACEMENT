@@ -62,7 +62,7 @@ const CompanyDashboard = () => {
       // Load company profile
       const { data: company } = await supabase
         .from('companies')
-        .select('*')
+        .select('company_name, industry, auth_id, verified, created_at')
         .eq('auth_id', user.id)
         .single();
 
@@ -72,7 +72,7 @@ const CompanyDashboard = () => {
         // Load job postings
         const { data: jobs } = await supabase
           .from('companies')
-          .select('*')
+          .select('company_name, industry, job_requirements, job_description, location, salary_range, created_at')
           .eq('auth_id', user.id);
         setJobPostings(jobs || []);
 

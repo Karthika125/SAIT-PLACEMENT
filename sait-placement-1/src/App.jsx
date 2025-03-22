@@ -1,15 +1,15 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import { useEffect, useState } from 'react';
 import { supabase } from './config/supabaseClient';
-import './config/testConnection';
 import StudentAuth from './components/auth/StudentAuth';
 import StudentDashboard from './components/student/StudentDashboard';
 import CompanyDashboard from './components/company/CompanyDashboard';
 import StudentProfile from './components/student/StudentProfile';
+import CompanyAuth from './components/auth/CompanyAuth';
 
 const theme = createTheme({
   palette: {
@@ -25,136 +25,146 @@ const theme = createTheme({
   },
 });
 
-// Protected Route Component
-const ProtectedRoute = ({ children, requiredRole }) => {
+const PrivateRoute = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        if (session) {
-          // Check if user is a company
-          const { data: company } = await supabase
-            .from('companies')
-            .select('*')
-            .eq('auth_id', session.user.id)
-            .single();
-
-          setUserRole(company ? 'company' : 'student');
-        }
-      } catch (error) {
-        console.error('Session error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getSession();
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
-        // Check if user is a company
-        const { data: company } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('auth_id', session.user.id)
-          .single();
+      setLoading(false);
+    });
 
-        setUserRole(company ? 'company' : 'student');
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   if (loading) {
-    return null; // or a loading spinner
+    return null;
   }
 
   if (!session) {
-    return <Navigate to="/" />;
-  }
-
-  if (requiredRole && userRole !== requiredRole) {
-    return <Navigate to={`/${userRole}`} />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
 };
 
-function App() {
-  useEffect(() => {
-    // Test Supabase connection
-    const testConnection = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('students')
-          .select('count')
-          .limit(1);
-        
-        if (error) {
-          console.error('Supabase connection test failed:', error);
-        } else {
-          console.log('Supabase connection test successful:', data);
-        }
-      } catch (err) {
-        console.error('Supabase connection test error:', err);
-      }
-    };
+const StudentRoute = ({ children }) => {
+  const [isStudent, setIsStudent] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-    testConnection();
+  useEffect(() => {
+    const checkStudent = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        const { data } = await supabase
+          .from('students')
+          .select('*')
+          .eq('email', session.user.email)
+          .single();
+        setIsStudent(!!data);
+      }
+      setLoading(false);
+    };
+    checkStudent();
   }, []);
 
+  if (loading) return null;
+  if (!isStudent) return <Navigate to="/" replace />;
+  return children;
+};
+
+const CompanyRoute = ({ children }) => {
+  const [isCompany, setIsCompany] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkCompany = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        const { data } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('email', session.user.email)
+          .single();
+        setIsCompany(!!data);
+      }
+      setLoading(false);
+    };
+    checkCompany();
+  }, []);
+
+  if (loading) return null;
+  if (!isCompany) return <Navigate to="/" replace />;
+  return children;
+};
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <StudentAuth />,
+  },
+  {
+    path: "/company/auth",
+    element: <CompanyAuth />,
+  },
+  {
+    path: "/student",
+    children: [
+      {
+        path: "dashboard",
+        element: (
+          <PrivateRoute>
+            <StudentRoute>
+              <StudentDashboard />
+            </StudentRoute>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "profile",
+        element: (
+          <PrivateRoute>
+            <StudentRoute>
+              <StudentProfile />
+            </StudentRoute>
+          </PrivateRoute>
+        ),
+      },
+    ],
+  },
+  {
+    path: "/company",
+    children: [
+      {
+        path: "dashboard",
+        element: (
+          <PrivateRoute>
+            <CompanyRoute>
+              <CompanyDashboard />
+            </CompanyRoute>
+          </PrivateRoute>
+        ),
+      },
+    ],
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
+  },
+]);
+
+function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-        <Router>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<StudentAuth />} />
-
-            {/* Protected Student Routes */}
-            <Route
-              path="/student/dashboard"
-              element={
-                <ProtectedRoute requiredRole="student">
-                  <StudentDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/student/profile"
-              element={
-                <ProtectedRoute requiredRole="student">
-                  <StudentProfile />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Protected Company Routes */}
-            <Route
-              path="/company/dashboard"
-              element={
-                <ProtectedRoute requiredRole="company">
-                  <CompanyDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
+        <RouterProvider router={router} />
       </Box>
     </ThemeProvider>
   );
