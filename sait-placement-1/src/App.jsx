@@ -11,6 +11,8 @@ import CompanyDashboard from './components/company/CompanyDashboard';
 import StudentProfile from './components/student/StudentProfile';
 import CompanyAuth from './components/auth/CompanyAuth';
 import Register from './components/auth/Register';
+import LandingPage from './components/landing/LandingPage';
+import AuthRouter from './components/auth/AuthRouter';
 
 // Create a base theme with our palette
 let theme = createTheme({
@@ -243,6 +245,14 @@ const CompanyRoute = ({ children }) => {
 const router = createBrowserRouter([
   {
     path: "/",
+    element: <LandingPage />,
+  },
+  {
+    path: "/auth",
+    element: <AuthRouter />,
+  },
+  {
+    path: "/student-auth",
     element: <StudentAuth />,
   },
   {

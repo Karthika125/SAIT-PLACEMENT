@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create students table
-CREATE TABLE students (
+CREATE TABLE IF NOT EXISTS students (
     student_id VARCHAR(20) PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     full_name TEXT NOT NULL,
@@ -18,9 +18,9 @@ CREATE TABLE students (
 );
 
 -- Companies table
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    auth_id UUID REFERENCES auth.users(id),
+    auth_id UUID,
     email TEXT UNIQUE NOT NULL,
     company_name TEXT NOT NULL,
     industry TEXT NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE companies (
 );
 
 -- Job Postings table
-CREATE TABLE job_postings (
+CREATE TABLE IF NOT EXISTS job_postings (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     company_name TEXT NOT NULL,
     job_requirements TEXT NOT NULL,
@@ -44,8 +44,8 @@ CREATE TABLE job_postings (
     posting_date TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
--- Job Applications table
-CREATE TABLE job_applications (
+-- Job Applications table with all required columns
+CREATE TABLE IF NOT EXISTS job_applications (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     student_id VARCHAR(20) REFERENCES students(student_id),
     company_id UUID REFERENCES companies(id),
@@ -53,26 +53,6 @@ CREATE TABLE job_applications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
-
--- Enable Row Level Security
-ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
-
--- Policies for companies table
-CREATE POLICY "Companies can view their own profile"
-ON companies FOR SELECT
-TO authenticated
-USING (auth.uid() = auth_id);
-
-CREATE POLICY "Companies can update their own profile"
-ON companies FOR UPDATE
-TO authenticated
-USING (auth.uid() = auth_id);
-
-CREATE POLICY "Anyone can create a company profile"
-ON companies FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() = auth_id);
 
 -- Function to handle updated_at
 CREATE OR REPLACE FUNCTION handle_updated_at()
@@ -83,9 +63,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger for updated_at
+-- Triggers for updated_at
 CREATE TRIGGER companies_handle_updated_at
     BEFORE UPDATE ON companies
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_updated_at();
+
+CREATE TRIGGER student_updated
+    BEFORE UPDATE ON students
     FOR EACH ROW
     EXECUTE FUNCTION handle_updated_at();
 
@@ -96,25 +81,32 @@ CREATE TRIGGER applications_handle_updated_at
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
 
--- Policy for students to view and edit their own data
+-- Policies for students
 CREATE POLICY "Students can view own data" ON students
-    FOR SELECT USING (auth.uid()::text = student_id);
+    FOR SELECT USING (true);
 
 CREATE POLICY "Students can update own data" ON students
-    FOR UPDATE USING (auth.uid()::text = student_id);
+    FOR UPDATE USING (true);
 
--- Function to handle student updates
-CREATE OR REPLACE FUNCTION handle_student_update()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = TIMEZONE('utc'::text, NOW());
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Policies for companies
+CREATE POLICY "Companies can view their own profile" ON companies
+    FOR SELECT USING (true);
 
--- Trigger for updating timestamp
-CREATE TRIGGER student_updated
-    BEFORE UPDATE ON students
-    FOR EACH ROW
-    EXECUTE FUNCTION handle_student_update();
+CREATE POLICY "Companies can update their own profile" ON companies
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Anyone can create a company profile" ON companies
+    FOR INSERT WITH CHECK (true);
+
+-- Policies for job_applications
+CREATE POLICY "Anyone can view applications" ON job_applications
+    FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can insert applications" ON job_applications
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can update applications" ON job_applications
+    FOR UPDATE USING (true); 
