@@ -231,6 +231,16 @@ const AuthRouter = () => {
                     >
                       Company Login
                     </Button>
+                    <Button 
+                      variant="outlined" 
+                      color="secondary" 
+                      fullWidth
+                      component={Link}
+                      to="/company/auth"
+                      size={isMobile ? "small" : "medium"}
+                    >
+                      Register as Company
+                    </Button>
                   </Box>
                 </CardContent>
               </Card>

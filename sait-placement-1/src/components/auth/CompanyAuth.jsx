@@ -8,7 +8,9 @@ import {
   Paper,
   Alert,
   Grid,
-  Link
+  Link,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { supabase } from '../../config/supabaseClient';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
@@ -27,7 +29,8 @@ const CompanyAuth = () => {
     location: '',
     salary_range: '',
     email: '',
-    phone: ''
+    phone: '',
+    password: ''
   });
 
   const handleChange = (e) => {
@@ -100,7 +103,8 @@ const CompanyAuth = () => {
             salary_range: formData.salary_range || null,
             email: formData.email || null,
             phone: formData.phone || null,
-            verified: true
+            verified: true,
+            auth_id: `auth_${Date.now()}_${Math.random().toString(36).substring(2, 15)}` // Generate a unique auth_id
           }])
           .select()
           .single();
@@ -147,10 +151,20 @@ const CompanyAuth = () => {
               Back
             </Button>
             <Typography component="h1" variant="h5">
-              {isLogin ? 'Company Login' : 'Register Company'}
+              Company
             </Typography>
             <Box sx={{ width: 40 }} /> {/* Empty box for alignment */}
           </Box>
+          
+          <Tabs 
+            value={isLogin ? 0 : 1} 
+            onChange={(e, newValue) => setIsLogin(newValue === 0)}
+            variant="fullWidth"
+            sx={{ mb: 3 }}
+          >
+            <Tab label="Login" />
+            <Tab label="Register" />
+          </Tabs>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -165,6 +179,19 @@ const CompanyAuth = () => {
               onChange={handleChange}
               autoFocus
             />
+            
+            {isLogin && (
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                label="Password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+              />
+            )}
 
             {!isLogin && (
               <>
@@ -213,6 +240,15 @@ const CompanyAuth = () => {
                 <TextField
                   margin="normal"
                   fullWidth
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  fullWidth
                   multiline
                   rows={3}
                   label="Job Requirements"
@@ -242,21 +278,6 @@ const CompanyAuth = () => {
             >
               {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
             </Button>
-
-            <Grid container justifyContent="center">
-              <Grid item>
-                <Link
-                  component="button"
-                  variant="body2"
-                  onClick={() => {
-                    setIsLogin(!isLogin);
-                    setError('');
-                  }}
-                >
-                  {isLogin ? "New company? Register here" : "Already registered? Login"}
-                </Link>
-              </Grid>
-            </Grid>
           </Box>
         </Paper>
       </Box>
