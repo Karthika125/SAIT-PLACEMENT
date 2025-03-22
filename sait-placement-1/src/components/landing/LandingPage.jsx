@@ -584,13 +584,16 @@ const LandingPage = () => {
                 Contact
               </Typography>
               <Typography variant="body2" sx={{ mb: 1, opacity: 0.7 }}>
-                Southern Alberta Institute of Technology
+                School of Engineering
               </Typography>
               <Typography variant="body2" sx={{ mb: 1, opacity: 0.7 }}>
-                1301 16 Ave NW, Calgary, AB T2M 0L4
+                Cochin University of Science and Technology
               </Typography>
               <Typography variant="body2" sx={{ mb: 1, opacity: 0.7 }}>
-                placement@sait.ca
+                Thrikkakara, Ernakulam, Kerala
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1, opacity: 0.7 }}>
+                placements@sait.ac.in
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.7 }}>
                 (403) 284-7248
