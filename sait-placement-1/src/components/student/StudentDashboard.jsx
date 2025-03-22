@@ -21,7 +21,9 @@ import {
   Tab,
   IconButton,
   Tooltip,
-  Divider
+  Divider,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -36,7 +38,8 @@ import { searchJobs } from '../../services/companyService';
 import { dashboardStyles } from '../../styles/dashboardStyles';
 import { extractTextFromPDF, validatePDFFile, findSkillsInContext } from '../../utils/pdfUtils';
 import { Link } from 'react-router-dom';
-import { applyToJob, getApplicationStatus } from '../../services/applicationService';
+import { applyToJob, getApplicationStatus, getStudentApplications } from '../../services/applicationService';
+import { updateJobApplicationsSchema } from '../../services/updateSchemaService';
 
 const StudentDashboard = () => {
   // State for resume handling
@@ -71,6 +74,28 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
 
   const [applicationStatuses, setApplicationStatuses] = useState({});
+
+  // Add notification state
+  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+
+  // Add state for schema update
+  const [isSchemaUpdateNeeded, setIsSchemaUpdateNeeded] = useState(false);
+  const [isUpdatingSchema, setIsUpdatingSchema] = useState(false);
+  
+  // Add responsive state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+
+  // Add resize listener for responsive layout
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 600);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     // Get current session
@@ -361,59 +386,198 @@ const StudentDashboard = () => {
     setActiveTab(newValue);
   };
 
-  const handleApply = async (companyId, jobTitle) => {
+  const handleUpdateSchema = async () => {
     try {
-      await applyToJob(companyId, jobTitle);
-      // Refresh application status
-      const status = await getApplicationStatus(companyId, jobTitle);
-      setApplicationStatuses(prev => ({
-        ...prev,
-        [`${companyId}-${jobTitle}`]: status?.status
-      }));
-      alert('Application submitted successfully!');
+      setIsUpdatingSchema(true);
+      const result = await updateJobApplicationsSchema();
+      
+      if (result.success) {
+        setNotification({
+          open: true,
+          message: 'Database schema updated successfully. Try applying again.',
+          severity: 'success'
+        });
+        setIsSchemaUpdateNeeded(false);
+      } else {
+        setNotification({
+          open: true,
+          message: 'Failed to update database schema. Please contact administrator.',
+          severity: 'error'
+        });
+        console.error('Schema update failed:', result.error);
+      }
     } catch (error) {
-      alert(error.message);
+      console.error('Schema update error:', error);
+      setNotification({
+        open: true,
+        message: 'Error updating database schema',
+        severity: 'error'
+      });
+    } finally {
+      setIsUpdatingSchema(false);
+    }
+  };
+
+  const handleApply = async (companyId, companyName) => {
+    try {
+      setIsSearching(true);
+      
+      // Check if already applied
+      if (applicationStatuses[companyId]) {
+        setNotification({
+          open: true,
+          message: `You have already applied to ${companyName}`,
+          severity: 'info'
+        });
+        return;
+      }
+      
+      const { success } = await applyToJob(companyId);
+      
+      // Update application status locally
+      const updatedStatuses = { ...applicationStatuses };
+      updatedStatuses[companyId] = 'pending';
+      setApplicationStatuses(updatedStatuses);
+      
+      setNotification({
+        open: true,
+        message: `Successfully applied to ${companyName}!`,
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error applying to job:', error);
+      
+      // Check if this is a schema error
+      if (error.message && error.message.includes('column')) {
+        setIsSchemaUpdateNeeded(true);
+      }
+      
+      setNotification({
+        open: true,
+        message: error.message || 'Error applying to job',
+        severity: 'error'
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const loadApplicationStatuses = async () => {
+    try {
+      if (!session) {
+        console.log('No active session, cannot load application statuses');
+        return;
+      }
+      
+      console.log('Loading application statuses for current student');
+      
+      // Use the getStudentApplications function to get all applications in one go
+      const applications = await getStudentApplications();
+      console.log('Fetched applications:', applications);
+      
+      if (!applications || applications.length === 0) {
+        console.log('No applications found for this student');
+        return;
+      }
+      
+      const statuses = {};
+      applications.forEach(app => {
+        if (app.companies && app.companies.id) {
+          console.log(`Setting status for company ${app.companies.company_name} (${app.companies.id}): ${app.status}`);
+          statuses[app.companies.id] = app.status;
+        } else {
+          console.warn('Application missing company data:', app);
+        }
+      });
+      
+      console.log('Final application statuses:', statuses);
+      setApplicationStatuses(statuses);
+    } catch (error) {
+      console.error('Error loading application statuses:', error);
+      setNotification({
+        open: true,
+        message: 'Failed to load your application statuses',
+        severity: 'error'
+      });
     }
   };
 
   // Load application statuses when companies are loaded
   useEffect(() => {
-    const loadApplicationStatuses = async () => {
-      const statuses = {};
-      for (const company of matchedCompanies) {
-        const status = await getApplicationStatus(company.id, company.job_title);
-        if (status) {
-          statuses[`${company.id}-${company.job_title}`] = status.status;
-        }
-      }
-      setApplicationStatuses(statuses);
-    };
-
     if (matchedCompanies.length > 0) {
       loadApplicationStatuses();
     }
   }, [matchedCompanies]);
 
+  // Add this before the final return statement to conditionally render the schema update dialog
+  if (isSchemaUpdateNeeded) {
+    return (
+      <Box sx={dashboardStyles.root}>
+        <Paper sx={{ p: isMobile ? 2 : 4, maxWidth: 600, mx: 'auto', textAlign: 'center' }}>
+          <Typography variant="h5" gutterBottom>
+            Database Update Required
+          </Typography>
+          <Typography variant="body1" paragraph>
+            There seems to be an issue with the database schema. This can happen when the application is updated but the database hasn't been migrated yet.
+          </Typography>
+          <Typography variant="body1" paragraph>
+            Click the button below to update the database schema. This will only take a moment.
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleUpdateSchema}
+            disabled={isUpdatingSchema}
+            sx={{ mt: 2 }}
+            fullWidth={isMobile}
+          >
+            {isUpdatingSchema ? 'Updating Schema...' : 'Update Database Schema'}
+          </Button>
+        </Paper>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={dashboardStyles.root}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Student Dashboard</Typography>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between', 
+        alignItems: isMobile ? 'stretch' : 'center', 
+        mb: 3,
+        gap: isMobile ? 2 : 0
+      }}>
+        <Typography variant={isMobile ? "h5" : "h4"}>Student Dashboard</Typography>
         <Button
           variant="contained"
           color="primary"
           component={Link}
           to="/student/profile"
+          fullWidth={isMobile}
+          size={isMobile ? "small" : "medium"}
         >
           My Profile
         </Button>
       </Box>
-      <Grid container spacing={3}>
+      <Grid container spacing={isMobile ? 2 : 3}>
         {/* Profile and Resume Section */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-              <AccountCircleIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
-              <Typography variant="h5">Profile</Typography>
+          <Paper sx={{ p: isMobile ? 2 : 3, height: '100%' }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              mb: 3,
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: isMobile ? 1 : 0
+            }}>
+              <AccountCircleIcon sx={{ 
+                fontSize: 40, 
+                mr: isMobile ? 0 : 2, 
+                mb: isMobile ? 1 : 0,
+                color: 'primary.main' 
+              }} />
+              <Typography variant="h5" align={isMobile ? "center" : "left"}>Profile</Typography>
             </Box>
             
             {/* Resume Upload with improved UI */}
@@ -532,23 +696,45 @@ const StudentDashboard = () => {
           </Paper>
         </Grid>
 
-        {/* Main Content Area with Tabs */}
+        {/* Jobs and Applications Section */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3 }}>
-            <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+          <Paper sx={{ p: isMobile ? 2 : 3, height: '100%' }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={(e, newValue) => setActiveTab(newValue)} 
+              variant={isMobile ? "fullWidth" : "standard"}
+              sx={{ mb: 3 }}
+            >
               <Tab 
                 icon={<WorkIcon />} 
-                label="Job Matches" 
-                iconPosition="start"
+                label={isMobile ? "" : "Job Matches"} 
+                aria-label="Job Matches"
+                sx={{ 
+                  minWidth: isMobile ? '0' : '90px',
+                  px: isMobile ? 1 : 2
+                }}
+              />
+              <Tab 
+                icon={<AssignmentIcon />} 
+                label={isMobile ? "" : "Applications"} 
+                aria-label="Applications"
+                sx={{ 
+                  minWidth: isMobile ? '0' : '90px',
+                  px: isMobile ? 1 : 2
+                }}
               />
               <Tab 
                 icon={<QuizIcon />} 
-                label="Mock Tests" 
-                iconPosition="start"
+                label={isMobile ? "" : "Mock Tests"} 
+                aria-label="Mock Tests"
+                sx={{ 
+                  minWidth: isMobile ? '0' : '90px',
+                  px: isMobile ? 1 : 2
+                }}
               />
             </Tabs>
 
-            {/* Job Matches Tab */}
+            {/* Tab Content */}
             {activeTab === 0 && (
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -572,9 +758,9 @@ const StudentDashboard = () => {
                               boxShadow: 3,
                               transform: 'translateY(-2px)',
                               transition: 'all 0.3s'
-                            }
+                            },
+                            cursor: 'default'
                           }}
-                          onClick={() => handleCustomizeResume(company)}
                         >
                           <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -619,14 +805,22 @@ const StudentDashboard = () => {
                                 <Button
                                   variant="contained"
                                   color="primary"
-                                  onClick={() => handleApply(company.id, company.job_title)}
-                                  disabled={applicationStatuses[`${company.id}-${company.job_title}`] === 'pending'}
+                                  onClick={(e) => {
+                                    e.stopPropagation(); 
+                                    console.log(`Apply Now clicked for company: ${company.company_name}, ID: ${company.id}`);
+                                    handleApply(company.id, company.company_name);
+                                  }}
+                                  disabled={applicationStatuses[company.id]}
                                 >
-                                  {applicationStatuses[`${company.id}-${company.job_title}`] ? `Applied - ${applicationStatuses[`${company.id}-${company.job_title}`]}` : 'Apply Now'}
+                                  {applicationStatuses[company.id] ? `Applied - ${applicationStatuses[company.id]}` : 'Apply Now'}
                                 </Button>
                                 <Button
                                   variant="outlined"
-                                  onClick={() => handleCustomizeResume(company)}
+                                  onClick={(e) => {
+                                    e.stopPropagation(); 
+                                    console.log(`Customize Resume clicked for company: ${company.company_name}`);
+                                    handleCustomizeResume(company);
+                                  }}
                                 >
                                   Customize Resume
                                 </Button>
@@ -645,7 +839,6 @@ const StudentDashboard = () => {
               </Box>
             )}
 
-            {/* Mock Tests Tab */}
             {activeTab === 1 && (
               <Box>
                 <Typography variant="h6" gutterBottom>
@@ -697,12 +890,13 @@ const StudentDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Customize Resume Dialog */}
+      {/* Company Customize Dialog */}
       <Dialog
         open={openCustomizeDialog}
         onClose={() => setOpenCustomizeDialog(false)}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle>Customize Resume for {selectedCompany?.company_name}</DialogTitle>
         <DialogContent>
@@ -738,7 +932,21 @@ const StudentDashboard = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenCustomizeDialog(false)}>Close</Button>
+          <Button 
+            onClick={() => setOpenCustomizeDialog(false)}
+            fullWidth={isMobile}
+            size={isMobile ? "small" : "medium"}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleApply}
+            fullWidth={isMobile}
+            size={isMobile ? "small" : "medium"}
+          >
+            Apply
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -748,6 +956,7 @@ const StudentDashboard = () => {
         onClose={() => setOpenTestDialog(false)}
         maxWidth="sm"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle>Start Mock Test</DialogTitle>
         <DialogContent>
@@ -780,18 +989,42 @@ const StudentDashboard = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenTestDialog(false)}>Cancel</Button>
+          <Button 
+            onClick={() => setOpenTestDialog(false)}
+            fullWidth={isMobile}
+            size={isMobile ? "small" : "medium"}
+          >
+            Cancel
+          </Button>
           <Button 
             variant="contained" 
             onClick={() => {
               // Handle test start
               setOpenTestDialog(false);
             }}
+            fullWidth={isMobile}
+            size={isMobile ? "small" : "medium"}
           >
             Start Test
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Add Notification Snackbar at the end of the component before the final closing tag */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification({ ...notification, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: isMobile ? 'center' : 'right' }}
+      >
+        <Alert
+          onClose={() => setNotification({ ...notification, open: false })}
+          severity={notification.severity}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

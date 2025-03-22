@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider, createTheme, responsiveFontSizes } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import { useEffect, useState } from 'react';
@@ -12,7 +12,8 @@ import StudentProfile from './components/student/StudentProfile';
 import CompanyAuth from './components/auth/CompanyAuth';
 import Register from './components/auth/Register';
 
-const theme = createTheme({
+// Create a base theme with our palette
+let theme = createTheme({
   palette: {
     primary: {
       main: '#1976d2',
@@ -24,7 +25,97 @@ const theme = createTheme({
       default: '#f5f5f5',
     },
   },
+  // Add responsive breakpoints
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 960,
+      lg: 1280,
+      xl: 1920,
+    },
+  },
+  // Customize typography for better readability
+  typography: {
+    fontFamily: [
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'Roboto',
+      '"Helvetica Neue"',
+      'Arial',
+      'sans-serif',
+    ].join(','),
+    // Adjust font sizes
+    h4: {
+      fontSize: '1.75rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.5rem',
+      },
+    },
+    h5: {
+      fontSize: '1.4rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.25rem',
+      },
+    },
+    h6: {
+      fontSize: '1.25rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.1rem',
+      },
+    },
+    body1: {
+      fontSize: '1rem',
+      '@media (max-width:600px)': {
+        fontSize: '0.95rem',
+      },
+    },
+  },
+  // Add custom component styles
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          borderRadius: '8px',
+        },
+      },
+      defaultProps: {
+        disableElevation: true,
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          },
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: '12px',
+        },
+      },
+    },
+  },
 });
+
+// Apply responsive font sizes
+theme = responsiveFontSizes(theme);
 
 // For student routes that require auth
 const PrivateRoute = ({ children }) => {
@@ -210,7 +301,11 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex' }}>
+      <Box sx={{ 
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh'
+      }}>
         <RouterProvider router={router} />
       </Box>
     </ThemeProvider>
