@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -29,9 +29,12 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import QuizIcon from '@mui/icons-material/Quiz';
 import WorkIcon from '@mui/icons-material/Work';
 import InfoIcon from '@mui/icons-material/Info';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../config/supabaseClient';
+import { getStudentProfile } from '../../services/studentService';
+import { searchJobs } from '../../services/companyService';
 import { dashboardStyles } from '../../styles/dashboardStyles';
 import { extractTextFromPDF, validatePDFFile, findSkillsInContext } from '../../utils/pdfUtils';
-import { searchJobs } from '../../services/companyService';
 
 const StudentDashboard = () => {
   // State for resume handling
@@ -59,6 +62,45 @@ const StudentDashboard = () => {
   const [selectedTest, setSelectedTest] = useState('');
   const [openTestDialog, setOpenTestDialog] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+
+  // State for session and profile
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Get current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+      setSession(session);
+      
+      // Fetch student profile
+      getStudentProfile(session.user.user_metadata.student_id)
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching profile:', error);
+            return;
+          }
+          setProfile(data);
+        });
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   // Available fields and their required skills
   const availableFields = [
