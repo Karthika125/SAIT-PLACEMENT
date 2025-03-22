@@ -33,6 +33,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { useNavigate } from 'react-router-dom';
 import { dashboardStyles } from '../../styles/dashboardStyles';
 import { supabase } from '../../config/supabaseClient';
+import { getCompanyApplications, updateApplicationStatus } from '../../services/applicationService';
 
 const CompanyDashboard = () => {
   const navigate = useNavigate();
@@ -69,32 +70,62 @@ const CompanyDashboard = () => {
           .eq('company_name', companyData.company_name)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching company profile:', error);
+          throw error;
+        }
+        
+        if (!company) {
+          console.error('Company not found:', companyData.company_name);
+          throw new Error('Company profile not found');
+        }
+        
+        console.log('Company data loaded:', company);
         setCompanyProfile(company);
         setEditedProfile(company);
 
-        // Get job postings
-        const { data: jobs, error: jobsError } = await supabase
-          .from('job_postings')
-          .select('*')
-          .eq('company_name', company.company_name);
+        try {
+          // Get job postings - in a separate try/catch to prevent it from affecting other operations
+          console.log('Fetching job postings for company:', company.company_name);
+          const { data: jobs, error: jobsError } = await supabase
+            .from('job_postings')
+            .select('*')
+            .eq('company_name', company.company_name);
 
-        if (jobsError) throw jobsError;
-        setJobPostings(jobs || []);
+          if (jobsError) {
+            console.error('Error fetching job postings:', jobsError);
+            // Don't throw, just log and continue with empty jobs
+            setJobPostings([]);
+          } else {
+            console.log('Job postings loaded:', jobs);
+            setJobPostings(jobs || []);
+          }
+        } catch (jobError) {
+          console.error('Exception in job postings fetch:', jobError);
+          setJobPostings([]);
+        }
 
-        // Get applications
-        const { data: apps, error: appsError } = await supabase
-          .from('applications')
-          .select('*, students(*)')
-          .eq('company_name', company.company_name);
-
-        if (appsError) throw appsError;
-        setApplications(apps || []);
+        try {
+          // Get applications using the applicationService - in a separate try/catch
+          console.log('Fetching applications for company ID:', company.id);
+          const applications = await getCompanyApplications(company.id);
+          console.log('Applications fetched:', applications);
+          setApplications(applications || []);
+        } catch (appError) {
+          console.error('Exception in applications fetch:', appError);
+          setApplications([]);
+          // Show notification for this specific error
+          setNotification({
+            open: true,
+            message: 'Error loading applications: ' + appError.message,
+            severity: 'error'
+          });
+        }
       } catch (error) {
-        console.error('Error loading company data:', error);
+        console.error('Error in loadCompanyData:', error);
         setNotification({
           open: true,
-          message: 'Error loading company data',
+          message: 'Error loading company data: ' + (error.message || 'Unknown error'),
           severity: 'error'
         });
       }
@@ -180,6 +211,31 @@ const CompanyDashboard = () => {
     setViewProfileDialog(true);
   };
 
+  const handleUpdateApplicationStatus = async (applicationId, newStatus) => {
+    try {
+      await updateApplicationStatus(applicationId, newStatus);
+
+      // Update local state
+      const updatedApplications = applications.map(app => 
+        app.id === applicationId ? { ...app, status: newStatus } : app
+      );
+      setApplications(updatedApplications);
+
+      setNotification({
+        open: true,
+        message: `Application ${newStatus}`,
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error updating application status:', error);
+      setNotification({
+        open: true,
+        message: 'Error updating application status',
+        severity: 'error'
+      });
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AppBar position="static">
@@ -258,26 +314,28 @@ const CompanyDashboard = () => {
         {activeTab === 1 && (
           <Box sx={{ mt: 3 }}>
             <Paper sx={{ p: 3, mb: 3 }}>
-              <Typography variant="h6" gutterBottom>Create New Job Posting</Typography>
+              <Typography variant="h5" gutterBottom>Create New Job Posting</Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Job Requirements"
-                    multiline
-                    rows={3}
-                    value={newPosting.job_requirements}
-                    onChange={(e) => setNewPosting({ ...newPosting, job_requirements: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12}>
+                <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
                     label="Job Description"
                     multiline
-                    rows={3}
+                    rows={4}
                     value={newPosting.job_description}
                     onChange={(e) => setNewPosting({ ...newPosting, job_description: e.target.value })}
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Job Requirements (comma separated skills)"
+                    multiline
+                    rows={4}
+                    value={newPosting.job_requirements}
+                    onChange={(e) => setNewPosting({ ...newPosting, job_requirements: e.target.value })}
+                    margin="normal"
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -286,6 +344,7 @@ const CompanyDashboard = () => {
                     label="Location"
                     value={newPosting.location}
                     onChange={(e) => setNewPosting({ ...newPosting, location: e.target.value })}
+                    margin="normal"
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -294,6 +353,7 @@ const CompanyDashboard = () => {
                     label="Salary Range"
                     value={newPosting.salary_range}
                     onChange={(e) => setNewPosting({ ...newPosting, salary_range: e.target.value })}
+                    margin="normal"
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -301,7 +361,7 @@ const CompanyDashboard = () => {
                     variant="contained"
                     startIcon={<AddIcon />}
                     onClick={handleCreateJob}
-                    fullWidth
+                    disabled={!newPosting.job_description || !newPosting.job_requirements}
                   >
                     Post Job
                   </Button>
@@ -309,32 +369,42 @@ const CompanyDashboard = () => {
               </Grid>
             </Paper>
 
-            <Typography variant="h6" gutterBottom>Current Job Postings</Typography>
+            <Typography variant="h5" gutterBottom>Current Job Postings</Typography>
             <Grid container spacing={3}>
-              {jobPostings.map((job) => (
-                <Grid item xs={12} md={6} key={job.id}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Job Requirements
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        {job.job_requirements}
-                      </Typography>
-                      <Typography variant="h6" gutterBottom>
-                        Job Description
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        {job.job_description}
-                      </Typography>
-                      <Box sx={{ mt: 2 }}>
-                        <Chip label={`Location: ${job.location}`} sx={{ mr: 1 }} />
-                        <Chip label={`Salary: ${job.salary_range}`} />
-                      </Box>
-                    </CardContent>
-                  </Card>
+              {jobPostings.length === 0 ? (
+                <Grid item xs={12}>
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1">No job postings yet. Create your first job posting above.</Typography>
+                  </Paper>
                 </Grid>
-              ))}
+              ) : (
+                jobPostings.map((job, index) => (
+                  <Grid item xs={12} md={6} key={index}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>{job.job_description}</Typography>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          Posted: {new Date(job.posting_date).toLocaleDateString()}
+                        </Typography>
+                        <Typography variant="body1" paragraph>
+                          <strong>Location:</strong> {job.location}
+                        </Typography>
+                        <Typography variant="body1" paragraph>
+                          <strong>Salary Range:</strong> {job.salary_range}
+                        </Typography>
+                        <Typography variant="body1" paragraph>
+                          <strong>Requirements:</strong>
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                          {job.job_requirements.split(',').map((skill, idx) => (
+                            <Chip key={idx} label={skill.trim()} size="small" />
+                          ))}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))
+              )}
             </Grid>
           </Box>
         )}
@@ -342,62 +412,127 @@ const CompanyDashboard = () => {
         {/* Applications Tab */}
         {activeTab === 2 && (
           <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>Student Applications</Typography>
-            <List>
-              {applications.map((application) => (
-                <React.Fragment key={application.id}>
-                  <ListItem>
-                    <Box sx={{ width: '100%' }}>
-                      <Typography variant="subtitle1">
-                        {application.students?.full_name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Department: {application.students?.department}
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleViewStudentProfile(application.students)}
-                        >
-                          View Profile
-                        </Button>
-                      </Box>
-                    </Box>
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
-              ))}
-            </List>
+            <Typography variant="h5" gutterBottom>Student Applications</Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              sx={{ mb: 2 }}
+              onClick={() => loadCompanyData()}
+            >
+              Refresh Applications
+            </Button>
+            <Grid container spacing={3}>
+              {applications.length === 0 ? (
+                <Grid item xs={12}>
+                  <Paper sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1">No applications yet.</Typography>
+                  </Paper>
+                </Grid>
+              ) : (
+                applications.map((application, index) => (
+                  <Grid item xs={12} key={application.id || index}>
+                    <Card>
+                      <CardContent>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={8}>
+                            <Typography variant="h6">
+                              {application.students?.full_name || "Student Name Not Available"}
+                              {" "}
+                              <Chip 
+                                label={application.status} 
+                                color={
+                                  application.status === 'accepted' ? 'success' :
+                                  application.status === 'rejected' ? 'error' : 'default'
+                                }
+                                size="small"
+                              />
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary" gutterBottom>
+                              Student ID: {application.student_id}
+                            </Typography>
+                            {application.students ? (
+                              <>
+                                <Typography variant="body2" color="textSecondary" gutterBottom>
+                                  Department: {application.students.department || "Unknown"}
+                                </Typography>
+                                <Typography variant="body2" color="textSecondary" gutterBottom>
+                                  CGPA: {application.students.cgpa || "N/A"}
+                                </Typography>
+                                {application.students.skills && (
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2">Skills:</Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                      {application.students.skills.map((skill, idx) => (
+                                        <Chip key={idx} label={skill} size="small" />
+                                      ))}
+                                    </Box>
+                                  </Box>
+                                )}
+                              </>
+                            ) : (
+                              <Typography variant="body2" color="error">
+                                Student profile information is not available
+                              </Typography>
+                            )}
+                          </Grid>
+                          <Grid item xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center' }}>
+                            {application.students && (
+                              <Button 
+                                variant="outlined" 
+                                onClick={() => handleViewStudentProfile(application.students)}
+                              >
+                                View Full Profile
+                              </Button>
+                            )}
+                            {application.status === 'pending' && (
+                              <>
+                                <Button 
+                                  variant="contained" 
+                                  color="success"
+                                  onClick={() => handleUpdateApplicationStatus(application.id, 'accepted')}
+                                >
+                                  Accept
+                                </Button>
+                                <Button 
+                                  variant="contained" 
+                                  color="error"
+                                  onClick={() => handleUpdateApplicationStatus(application.id, 'rejected')}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))
+              )}
+            </Grid>
           </Box>
         )}
       </Container>
 
       {/* Student Profile Dialog */}
-      <Dialog
-        open={viewProfileDialog}
-        onClose={() => setViewProfileDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={viewProfileDialog} onClose={() => setViewProfileDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>Student Profile</DialogTitle>
         <DialogContent>
           {selectedStudent && (
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid item xs={12} md={6}>
                 <Typography variant="h6">{selectedStudent.full_name}</Typography>
+                <Typography variant="body1">Department: {selectedStudent.department}</Typography>
+                <Typography variant="body1">Year of Study: {selectedStudent.year_of_study}</Typography>
+                <Typography variant="body1">CGPA: {selectedStudent.cgpa}</Typography>
+                <Typography variant="body1">Email: {selectedStudent.email}</Typography>
+                <Typography variant="body1">Phone: {selectedStudent.phone}</Typography>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography><strong>Department:</strong> {selectedStudent.department}</Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography><strong>Year of Study:</strong> {selectedStudent.year_of_study}</Typography>
-              </Grid>
-              <Grid item xs={12}>
-                <Typography><strong>Skills:</strong></Typography>
-                <Box sx={{ mt: 1 }}>
-                  {selectedStudent.skills?.map((skill, index) => (
-                    <Chip key={index} label={skill} sx={{ m: 0.5 }} />
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6">Skills</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                  {selectedStudent.skills && selectedStudent.skills.map((skill, idx) => (
+                    <Chip key={idx} label={skill} />
                   ))}
                 </Box>
               </Grid>
@@ -421,6 +556,7 @@ const CompanyDashboard = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Notification Snackbar */}
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}
