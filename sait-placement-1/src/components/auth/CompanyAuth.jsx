@@ -11,7 +11,8 @@ import {
   Link
 } from '@mui/material';
 import { supabase } from '../../config/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const CompanyAuth = () => {
   const navigate = useNavigate();
@@ -136,9 +137,20 @@ const CompanyAuth = () => {
         }}
       >
         <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            {isLogin ? 'Company Login' : 'Register Company'}
-          </Typography>
+          <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Button
+              component={RouterLink}
+              to="/auth"
+              startIcon={<ArrowBackIcon />}
+              sx={{ color: 'text.secondary', fontSize: '0.875rem' }}
+            >
+              Back
+            </Button>
+            <Typography component="h1" variant="h5">
+              {isLogin ? 'Company Login' : 'Register Company'}
+            </Typography>
+            <Box sx={{ width: 40 }} /> {/* Empty box for alignment */}
+          </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 

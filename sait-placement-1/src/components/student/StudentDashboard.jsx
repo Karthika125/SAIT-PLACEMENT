@@ -28,7 +28,11 @@ import {
   List,
   ListItem,
   ListItemText,
-  TextField
+  TextField,
+  FormControlLabel,
+  RadioGroup,
+  Radio,
+  CircularProgress
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -41,6 +45,11 @@ import SchoolIcon from '@mui/icons-material/School';
 import PhoneIcon from '@mui/icons-material/Phone';
 import GradeIcon from '@mui/icons-material/Grade';
 import BadgeIcon from '@mui/icons-material/Badge';
+import LogoutIcon from '@mui/icons-material/Logout';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../config/supabaseClient';
 import { getStudentProfile } from '../../services/studentService';
@@ -77,6 +86,14 @@ const StudentDashboard = () => {
   const [selectedTest, setSelectedTest] = useState('');
   const [openTestDialog, setOpenTestDialog] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [activeQuestion, setActiveQuestion] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [testInProgress, setTestInProgress] = useState(false);
+  const [testCompleted, setTestCompleted] = useState(false);
+  const [testScore, setTestScore] = useState(0);
+  const [testStartTime, setTestStartTime] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [showAnswers, setShowAnswers] = useState({});  // NEW STATE FOR SHOWING ANSWERS
 
   // State for session and profile
   const [session, setSession] = useState(null);
@@ -213,6 +230,1018 @@ const StudentDashboard = () => {
       { id: 7, name: 'Software Engineering', duration: '45 mins', questions: 30 },
       { id: 8, name: 'Data Science', duration: '45 mins', questions: 30 },
       { id: 9, name: 'Cloud Computing', duration: '45 mins', questions: 30 }
+    ]
+  };
+
+  // Mock test questions for each test
+  const mockTestQuestions = {
+    1: [ // Data Structures & Algorithms
+      {
+        id: 1,
+        question: "What is the time complexity of binary search?",
+        options: [
+          "O(n)",
+          "O(log n)",
+          "O(n log n)",
+          "O(n²)"
+        ],
+        correctAnswer: 1 // index of the correct answer
+      },
+      {
+        id: 2,
+        question: "Which data structure follows the LIFO (Last In First Out) principle?",
+        options: [
+          "Queue",
+          "Stack",
+          "Linked List",
+          "Array"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 3,
+        question: "What is the space complexity of quick sort?",
+        options: [
+          "O(1)",
+          "O(log n)",
+          "O(n)",
+          "O(n²)"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 4,
+        question: "Which sorting algorithm has the best average case performance?",
+        options: [
+          "Bubble Sort",
+          "Insertion Sort",
+          "Quick Sort",
+          "Selection Sort"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 5,
+        question: "What data structure is used to implement breadth-first search?",
+        options: [
+          "Stack",
+          "Queue",
+          "Array",
+          "Linked List"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 6,
+        question: "What is the worst-case time complexity of merge sort?",
+        options: [
+          "O(n)",
+          "O(n log n)",
+          "O(n²)",
+          "O(2ⁿ)"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 7,
+        question: "Which of the following is NOT a balanced binary search tree?",
+        options: [
+          "AVL Tree",
+          "Red-Black Tree",
+          "Binary Heap",
+          "B-Tree"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 8,
+        question: "What is the time complexity of accessing an element in a hash table?",
+        options: [
+          "O(1)",
+          "O(log n)",
+          "O(n)",
+          "O(n log n)"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 9,
+        question: "What algorithm is typically used to find the shortest path in a weighted graph?",
+        options: [
+          "Depth-First Search",
+          "Breadth-First Search",
+          "Dijkstra's Algorithm",
+          "Kruskal's Algorithm"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 10,
+        question: "Which data structure is most suitable for implementing a priority queue?",
+        options: [
+          "Linked List",
+          "Binary Heap",
+          "Stack",
+          "Queue"
+        ],
+        correctAnswer: 1
+      }
+    ],
+    2: [ // Web Development
+      {
+        id: 1,
+        question: "Which of the following is NOT a JavaScript framework?",
+        options: [
+          "React",
+          "Angular",
+          "Laravel",
+          "Vue"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 2,
+        question: "What does CSS stand for?",
+        options: [
+          "Computer Style Sheets",
+          "Creative Style Sheets",
+          "Cascading Style Sheets",
+          "Colorful Style Sheets"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 3,
+        question: "Which HTTP method is used to send data to a server to create/update a resource?",
+        options: [
+          "GET",
+          "POST",
+          "DELETE",
+          "PUT"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 4,
+        question: "Which of the following is a client-side storage mechanism in web browsers?",
+        options: [
+          "MySQL",
+          "MongoDB",
+          "Local Storage",
+          "PostgreSQL"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 5,
+        question: "What is the correct HTML for creating a hyperlink?",
+        options: [
+          "<a href='http://example.com'>Example</a>",
+          "<link>http://example.com</link>",
+          "<hyperlink>http://example.com</hyperlink>",
+          "<href>http://example.com</href>"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 6,
+        question: "Which of these is NOT a valid CSS selector?",
+        options: [
+          ".class-name",
+          "#id-name",
+          "*element-name",
+          ":hover"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 7,
+        question: "What does API stand for in web development?",
+        options: [
+          "Application Programming Interface",
+          "Application Protocol Interface",
+          "Advanced Programming Interface",
+          "Application Process Integration"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 8,
+        question: "Which of the following is used to make a responsive web design?",
+        options: [
+          "JavaScript",
+          "Media Queries",
+          "PHP",
+          "Java"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 9,
+        question: "What is the purpose of a JWT (JSON Web Token) in web applications?",
+        options: [
+          "To enhance webpage styling",
+          "To track user behavior",
+          "For user authentication and information exchange",
+          "To improve website loading speed"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 10,
+        question: "Which of the following is a front-end build tool?",
+        options: [
+          "Node.js",
+          "Express.js",
+          "Webpack",
+          "MongoDB"
+        ],
+        correctAnswer: 2
+      }
+    ],
+    3: [ // Database Management
+      {
+        id: 1,
+        question: "Which of the following is NOT a type of SQL join?",
+        options: [
+          "INNER JOIN",
+          "LEFT JOIN",
+          "CROSS JOIN",
+          "MERGE JOIN"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 2,
+        question: "What does ACID stand for in database transactions?",
+        options: [
+          "Atomicity, Consistency, Isolation, Durability",
+          "Atomicity, Closure, Isolation, Durability",
+          "Aggregation, Consistency, Isolation, Dependency",
+          "Association, Closure, Isolation, Durability"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 3,
+        question: "Which database model uses tables with rows and columns?",
+        options: [
+          "NoSQL",
+          "Hierarchical",
+          "Network",
+          "Relational"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 4,
+        question: "Which of the following is a NoSQL database?",
+        options: [
+          "MySQL",
+          "Oracle",
+          "MongoDB",
+          "PostgreSQL"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 5,
+        question: "What is a foreign key?",
+        options: [
+          "A key that can open any database",
+          "A key from a different database altogether",
+          "A field that uniquely identifies each record in a table",
+          "A field in a table that links to the primary key in another table"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 6,
+        question: "Which normalization form eliminates transitive dependencies?",
+        options: [
+          "First Normal Form (1NF)",
+          "Second Normal Form (2NF)",
+          "Third Normal Form (3NF)",
+          "Fourth Normal Form (4NF)"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 7,
+        question: "What SQL command is used to remove a table from a database?",
+        options: [
+          "DELETE TABLE",
+          "REMOVE TABLE",
+          "DROP TABLE",
+          "TRUNCATE TABLE"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 8,
+        question: "What is an index in a database?",
+        options: [
+          "A constraint that enforces unique values",
+          "A data structure that improves the speed of data retrieval operations",
+          "A primary key for a table",
+          "A type of database join"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 9,
+        question: "Which of these is NOT a common database constraint?",
+        options: [
+          "PRIMARY KEY",
+          "FOREIGN KEY",
+          "UNIQUE",
+          "MAXIMUM"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 10,
+        question: "In a database, what does the acronym DDL stand for?",
+        options: [
+          "Data Definition Language",
+          "Database Definition Logic",
+          "Data Development Language",
+          "Database Design Level"
+        ],
+        correctAnswer: 0
+      }
+    ],
+    4: [ // Quantitative Aptitude
+      {
+        id: 1,
+        question: "If 8 men can complete a work in 20 days, then how many days will 10 men take to complete the same work?",
+        options: [
+          "16 days",
+          "22 days",
+          "25 days",
+          "18 days"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 2,
+        question: "A train passes a 150m long platform in 15 seconds, while it passes a signal post in 10 seconds. What is the length of the train?",
+        options: [
+          "100m",
+          "150m",
+          "200m",
+          "300m"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 3,
+        question: "The average of five consecutive numbers is 30. What is the largest of these numbers?",
+        options: [
+          "32",
+          "28",
+          "30",
+          "34"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 4,
+        question: "If the simple interest on a sum for 2 years at 5% per annum is Rs. 50, then the sum is:",
+        options: [
+          "Rs. 500",
+          "Rs. 400",
+          "Rs. 600",
+          "Rs. 450"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 5,
+        question: "A shopkeeper marks his goods 20% above cost price and gives a discount of 10%. His profit percentage is:",
+        options: [
+          "8%",
+          "10%",
+          "12%",
+          "15%"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 6,
+        question: "If x² + y² = 25 and xy = 12, what is the value of (x + y)²?",
+        options: [
+          "25",
+          "49",
+          "36",
+          "24"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 7,
+        question: "A boat can travel 30 km upstream in 6 hours and 30 km downstream in 3 hours. What is the speed of the boat in still water?",
+        options: [
+          "7.5 km/h",
+          "10 km/h",
+          "12.5 km/h",
+          "15 km/h"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 8,
+        question: "The compound interest on a sum of money for 2 years at 10% per annum is Rs. 2,100. The simple interest for the same period and rate will be:",
+        options: [
+          "Rs. 1,900",
+          "Rs. 2,000",
+          "Rs. 2,050",
+          "Rs. 2,100"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 9,
+        question: "The ratio of the ages of two persons is 5:7. After 8 years, this ratio will be 7:9. What is the sum of their present ages?",
+        options: [
+          "36 years",
+          "48 years",
+          "60 years",
+          "72 years"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 10,
+        question: "A can complete a work in 12 days and B can complete the same work in 15 days. If they work together, in how many days will they complete the work?",
+        options: [
+          "6⅔ days",
+          "7½ days",
+          "6⅓ days",
+          "8½ days"
+        ],
+        correctAnswer: 0
+      }
+    ],
+    5: [ // Logical Reasoning
+      {
+        id: 1,
+        question: "In a row of students, Rahul is 7th from the left and Amit is 12th from the right. If they interchange their positions, Rahul becomes 22nd from the left. How many students are there in the row?",
+        options: [
+          "33",
+          "34",
+          "35",
+          "36"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 2,
+        question: "If 'FRIEND' is coded as 'GSJFOE', how is 'CANDLE' coded?",
+        options: [
+          "DBOEMF",
+          "EDRFOH",
+          "DEQJGH",
+          "DCQIPF"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 3,
+        question: "Complete the series: 3, 6, 11, 18, 27, __",
+        options: [
+          "36",
+          "38",
+          "40",
+          "42"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 4,
+        question: "Choose the odd one out.",
+        options: [
+          "Mercury",
+          "Mars",
+          "Moon",
+          "Venus"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 5,
+        question: "If South-East becomes North, North-East becomes West, then North-West becomes?",
+        options: [
+          "South-West",
+          "South",
+          "South-East",
+          "North-East"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 6,
+        question: "Pointing to a photograph, a woman said, 'This man's son is my son's father.' How is the woman related to the man in the photograph?",
+        options: [
+          "Mother",
+          "Grandmother",
+          "Daughter-in-law",
+          "Daughter"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 7,
+        question: "A is taller than B, C is taller than A, D is taller than E but shorter than B. Who is the tallest?",
+        options: [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 8,
+        question: "Find the missing letter in the series: A, D, G, J, __",
+        options: [
+          "K",
+          "L",
+          "M",
+          "N"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 9,
+        question: "If CAT is coded as 24 and DOG is coded as 26, then how would you code MOUSE?",
+        options: [
+          "60",
+          "63",
+          "65",
+          "70"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 10,
+        question: "In a certain code, 'DESKTOP' is written as 'EDKSTPO'. How is 'KEYBOARD' written in that code?",
+        options: [
+          "EYKDRAOB",
+          "EKABYDOR",
+          "EYKABDOR",
+          "EKYABDOR"
+        ],
+        correctAnswer: 0
+      }
+    ],
+    6: [ // Verbal Ability
+      {
+        id: 1,
+        question: "Choose the word that is most nearly opposite in meaning to 'FRUGAL'.",
+        options: [
+          "Careful",
+          "Cautious",
+          "Extravagant",
+          "Economical"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 2,
+        question: "Choose the word that is most nearly the same in meaning to 'AMELIORATE'.",
+        options: [
+          "Improve",
+          "Worsen",
+          "Destroy",
+          "Maintain"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 3,
+        question: "Choose the correct spelling:",
+        options: [
+          "Supercede",
+          "Supersede",
+          "Supresede",
+          "Superside"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 4,
+        question: "Choose the correct meaning of the idiom: 'To let the cat out of the bag'",
+        options: [
+          "To punish someone",
+          "To reveal a secret",
+          "To create confusion",
+          "To do something impossible"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 5,
+        question: "Choose the appropriate preposition: 'He was accused ____ theft.'",
+        options: [
+          "of",
+          "for",
+          "with",
+          "by"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 6,
+        question: "Choose the correctly punctuated sentence:",
+        options: [
+          "Hurray! We won the match.",
+          "Hurray, we won the match!",
+          "Hurray, we won the match.",
+          "Hurray we won the match!"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 7,
+        question: "Choose the sentence with the correct subject-verb agreement:",
+        options: [
+          "The committee are divided on this issue.",
+          "The committee is divided on this issue.",
+          "The committee were divided on this issue.",
+          "The committee have divided on this issue."
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 8,
+        question: "Identify the part of speech of the underlined word: 'She sings beautifully.'",
+        options: [
+          "Adjective",
+          "Verb",
+          "Adverb",
+          "Noun"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 9,
+        question: "What is a palindrome?",
+        options: [
+          "A word that has the same meaning as another word",
+          "A word that reads the same backward as forward",
+          "A word that sounds the same but has a different spelling",
+          "A word with multiple meanings"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 10,
+        question: "Choose the sentence that has NO error:",
+        options: [
+          "Neither of the students have completed their assignments.",
+          "Neither of the students has completed their assignments.",
+          "Neither of the students have completed his assignment.",
+          "Neither of the students has completed his assignment."
+        ],
+        correctAnswer: 3
+      }
+    ],
+    7: [ // Software Engineering
+      {
+        id: 1,
+        question: "Which of the following is NOT an Agile software development methodology?",
+        options: [
+          "Scrum",
+          "Kanban",
+          "Waterfall",
+          "Extreme Programming (XP)"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 2,
+        question: "What is the primary goal of Continuous Integration (CI)?",
+        options: [
+          "Automating software delivery to production",
+          "Identifying and fixing integration problems early",
+          "Ensuring code quality through automated tests",
+          "Managing dependencies between software components"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 3,
+        question: "Which of the following is NOT a SOLID principle in object-oriented design?",
+        options: [
+          "Single Responsibility Principle",
+          "Open/Closed Principle",
+          "Modular Design Principle",
+          "Dependency Inversion Principle"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 4,
+        question: "What does TDD stand for in software development?",
+        options: [
+          "Technical Design Document",
+          "Test-Driven Development",
+          "Type Definition Diagram",
+          "Total Defect Detection"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 5,
+        question: "Which of the following is a type of software testing that verifies individual units or components of a software?",
+        options: [
+          "Integration Testing",
+          "System Testing",
+          "Acceptance Testing",
+          "Unit Testing"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 6,
+        question: "Which diagram is best suited for modeling the static structure of a system in UML?",
+        options: [
+          "Sequence Diagram",
+          "Class Diagram",
+          "Use Case Diagram",
+          "Activity Diagram"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 7,
+        question: "What is the purpose of a design pattern in software engineering?",
+        options: [
+          "To ensure backward compatibility",
+          "To provide reusable solutions to common problems",
+          "To enforce coding standards",
+          "To eliminate the need for testing"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 8,
+        question: "Which of the following is NOT a type of software design pattern?",
+        options: [
+          "Creational",
+          "Structural",
+          "Behavioral",
+          "Functional"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 9,
+        question: "What is technical debt in software development?",
+        options: [
+          "The financial cost of software development",
+          "Extra work arising from choosing an easy solution now instead of better approach",
+          "The time required to learn new technologies",
+          "The cost of maintaining legacy systems"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 10,
+        question: "Which software development model emphasizes risk analysis and is suitable for large and complex projects?",
+        options: [
+          "Waterfall",
+          "Agile",
+          "Spiral",
+          "RAD (Rapid Application Development)"
+        ],
+        correctAnswer: 2
+      }
+    ],
+    8: [ // Data Science
+      {
+        id: 1,
+        question: "Which of the following is NOT a supervised learning algorithm?",
+        options: [
+          "Linear Regression",
+          "K-means Clustering",
+          "Support Vector Machines",
+          "Random Forests"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 2,
+        question: "What is the primary purpose of feature scaling in machine learning?",
+        options: [
+          "To reduce the number of features",
+          "To normalize features to a similar range",
+          "To increase model complexity",
+          "To eliminate irrelevant features"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 3,
+        question: "Which metric is most appropriate for evaluating a classification model with highly imbalanced classes?",
+        options: [
+          "Accuracy",
+          "Precision-Recall curve",
+          "Mean Squared Error",
+          "R-squared"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 4,
+        question: "What is the curse of dimensionality in data science?",
+        options: [
+          "The difficulty in visualizing high-dimensional data",
+          "The exponential increase in data volume as dimensions increase",
+          "The computational complexity of algorithms in high dimensions",
+          "All of the above"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 5,
+        question: "Which technique is used to prevent overfitting in machine learning models?",
+        options: [
+          "Hyperparameter tuning",
+          "Feature engineering",
+          "Regularization",
+          "All of the above"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 6,
+        question: "What is the main purpose of the Confusion Matrix in machine learning?",
+        options: [
+          "To visualize data distributions",
+          "To measure model accuracy",
+          "To evaluate classification model performance",
+          "To identify multicollinearity in features"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 7,
+        question: "Which algorithm is best suited for anomaly detection?",
+        options: [
+          "Linear Regression",
+          "Decision Trees",
+          "Isolation Forest",
+          "Naive Bayes"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 8,
+        question: "What does PCA (Principal Component Analysis) primarily accomplish?",
+        options: [
+          "Feature extraction and dimensionality reduction",
+          "Classification of data points",
+          "Time series forecasting",
+          "Natural language processing"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 9,
+        question: "Which of the following is NOT a common activation function in neural networks?",
+        options: [
+          "ReLU",
+          "Sigmoid",
+          "Tanh",
+          "Gaussian"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 10,
+        question: "What is the primary difference between bagging and boosting in ensemble learning?",
+        options: [
+          "Bagging trains models sequentially, boosting trains them in parallel",
+          "Bagging trains models in parallel, boosting trains them sequentially",
+          "Bagging uses weighted data samples, boosting doesn't",
+          "Bagging is supervised, boosting is unsupervised"
+        ],
+        correctAnswer: 1
+      }
+    ],
+    9: [ // Cloud Computing
+      {
+        id: 1,
+        question: "Which of the following is NOT a major cloud service model?",
+        options: [
+          "Infrastructure as a Service (IaaS)",
+          "Platform as a Service (PaaS)",
+          "Software as a Service (SaaS)",
+          "Hardware as a Service (HaaS)"
+        ],
+        correctAnswer: 3
+      },
+      {
+        id: 2,
+        question: "What is the main advantage of using a microservices architecture in cloud applications?",
+        options: [
+          "Simplified deployment procedures",
+          "Reduced need for testing",
+          "Independent scaling of services",
+          "Lower network latency"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 3,
+        question: "Which AWS service provides object storage with high durability and availability?",
+        options: [
+          "Amazon EC2",
+          "Amazon S3",
+          "Amazon RDS",
+          "Amazon DynamoDB"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 4,
+        question: "What is the primary purpose of a load balancer in cloud computing?",
+        options: [
+          "To distribute incoming network traffic across multiple servers",
+          "To optimize database query performance",
+          "To cache static content for faster delivery",
+          "To provision and manage virtual machines"
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 5,
+        question: "Which of the following is NOT a characteristic of cloud computing according to NIST?",
+        options: [
+          "On-demand self-service",
+          "Broad network access",
+          "Physical hardware ownership",
+          "Measured service"
+        ],
+        correctAnswer: 2
+      },
+      {
+        id: 6,
+        question: "What is Kubernetes primarily used for?",
+        options: [
+          "Virtualization of operating systems",
+          "Container orchestration and management",
+          "Database management",
+          "Networking and security"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 7,
+        question: "Which cloud deployment model provides services exclusively for a single organization?",
+        options: [
+          "Public Cloud",
+          "Private Cloud",
+          "Hybrid Cloud",
+          "Community Cloud"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 8,
+        question: "What does 'serverless computing' mean in the context of cloud services?",
+        options: [
+          "Computing without any servers",
+          "Computing where server management is handled by the provider",
+          "Computing with dedicated physical servers",
+          "Computing that doesn't require internet connection"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 9,
+        question: "Which of these is a key benefit of auto-scaling in cloud environments?",
+        options: [
+          "Reduced security vulnerabilities",
+          "Cost optimization by adjusting resources to match demand",
+          "Improved database performance",
+          "Enhanced user interface"
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 10,
+        question: "Which concept refers to running an application in multiple cloud environments to prevent vendor lock-in?",
+        options: [
+          "Cloud bursting",
+          "Multi-cloud strategy",
+          "Cloud federation",
+          "Hybrid networking"
+        ],
+        correctAnswer: 1
+      }
     ]
   };
 
@@ -397,10 +1426,116 @@ const StudentDashboard = () => {
   const handleTestSelect = (test) => {
     setSelectedTest(test);
     setOpenTestDialog(true);
+    setActiveQuestion(0);
+    setSelectedAnswers({});
+    setTestCompleted(false);
+    setTestScore(0);
   };
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
+  const startTest = () => {
+    if (!selectedTest || !mockTestQuestions[selectedTest.id]) {
+      setNotification({
+        open: true,
+        message: 'This test is not available yet.',
+        severity: 'warning'
+      });
+      setOpenTestDialog(false);
+      return;
+    }
+    
+    setTestInProgress(true);
+    setOpenTestDialog(false);
+    setTestStartTime(new Date());
+    setShowAnswers({}); // Reset show answers state
+    
+    // Calculate time remaining in seconds
+    const [durationValue, unit] = selectedTest.duration.split(' ');
+    let totalSeconds = parseInt(durationValue) * 60; // Convert minutes to seconds
+    setTimeRemaining(totalSeconds);
+    
+    // Start countdown timer
+    const timerInterval = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timerInterval);
+          completeTest();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+  
+  const handleAnswerSelect = (questionIndex, answerIndex) => {
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [questionIndex]: answerIndex
+    }));
+  };
+  
+  const toggleShowAnswer = (questionIndex) => {
+    // Only allow showing answers if the user has selected an answer for this question
+    if (selectedAnswers[questionIndex] !== undefined) {
+      setShowAnswers(prev => ({
+        ...prev,
+        [questionIndex]: !prev[questionIndex]
+      }));
+    } else {
+      setNotification({
+        open: true,
+        message: 'Please select an answer before viewing the correct answer',
+        severity: 'warning'
+      });
+    }
+  };
+  
+  const navigateQuestion = (direction) => {
+    if (!selectedTest || !mockTestQuestions[selectedTest.id]) {
+      return; // Exit early if no test is selected or no questions exist
+    }
+    
+    if (direction === 'next' && activeQuestion < mockTestQuestions[selectedTest.id].length - 1) {
+      setActiveQuestion(prev => prev + 1);
+      // Reset show answer state for the new question if it hasn't been set yet
+      if (showAnswers[activeQuestion + 1] === undefined) {
+        setShowAnswers(prev => ({...prev, [activeQuestion + 1]: false}));
+      }
+    } else if (direction === 'prev' && activeQuestion > 0) {
+      setActiveQuestion(prev => prev - 1);
+      // Reset show answer state for the new question if it hasn't been set yet
+      if (showAnswers[activeQuestion - 1] === undefined) {
+        setShowAnswers(prev => ({...prev, [activeQuestion - 1]: false}));
+      }
+    }
+  };
+  
+  const completeTest = () => {
+    if (!selectedTest || !mockTestQuestions[selectedTest.id]) {
+      setTestCompleted(true);
+      setTestInProgress(false);
+      return; // Exit early with default values
+    }
+    
+    // Calculate score
+    const questions = mockTestQuestions[selectedTest.id];
+    let correctAnswers = 0;
+    
+    Object.entries(selectedAnswers).forEach(([questionIdx, selectedAnswer]) => {
+      if (questions[questionIdx]?.correctAnswer === selectedAnswer) {
+        correctAnswers++;
+      }
+    });
+    
+    const scorePercent = Math.round((correctAnswers / questions.length) * 100);
+    setTestScore(scorePercent);
+    setTestCompleted(true);
+    setTestInProgress(false);
+  };
+  
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const handleUpdateSchema = async () => {
@@ -740,6 +1875,32 @@ const StudentDashboard = () => {
     );
   }
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/');
+      
+      // Show notification
+      setNotification({
+        open: true,
+        message: 'Successfully logged out',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error signing out:', error);
+      setNotification({
+        open: true,
+        message: 'Error signing out',
+        severity: 'error'
+      });
+    }
+  };
+
+  // Function to handle tab changes
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <Box sx={dashboardStyles.root}>
       <Box sx={{ 
@@ -751,6 +1912,15 @@ const StudentDashboard = () => {
         gap: isMobile ? 2 : 0
       }}>
         <Typography variant={isMobile ? "h5" : "h4"}>Student Dashboard</Typography>
+        <Button
+          variant="outlined"
+          color="primary"
+          startIcon={<LogoutIcon />}
+          onClick={handleLogout}
+          size={isMobile ? "small" : "medium"}
+        >
+          Logout
+        </Button>
       </Box>
       
       {/* Main content with tabs */}
@@ -1068,15 +2238,38 @@ const StudentDashboard = () => {
                         <Card 
                           sx={{ 
                             height: '100%',
-                            cursor: 'pointer',
-                            '&:hover': { 
+                            cursor: mockTestQuestions[test.id] ? 'pointer' : 'default',
+                            position: 'relative',
+                            '&:hover': mockTestQuestions[test.id] ? { 
                               boxShadow: 3,
                               transform: 'translateY(-2px)',
                               transition: 'all 0.3s'
-                            }
+                            } : {}
                           }}
-                          onClick={() => handleTestSelect(test)}
+                          onClick={() => mockTestQuestions[test.id] ? handleTestSelect(test) : null}
                         >
+                          {!mockTestQuestions[test.id] && (
+                            <Box 
+                              sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                backgroundColor: 'rgba(0,0,0,0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 1
+                              }}
+                            >
+                              <Chip 
+                                label="Coming Soon" 
+                                color="primary" 
+                                variant="outlined"
+                              />
+                            </Box>
+                          )}
                           <CardContent>
                             <Typography variant="h6" gutterBottom>
                               {test.name}
@@ -1086,8 +2279,18 @@ const StudentDashboard = () => {
                               Duration: {test.duration}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                              Questions: {test.questions}
+                              Questions: {mockTestQuestions[test.id] ? mockTestQuestions[test.id].length : test.questions}
                             </Typography>
+                            {mockTestQuestions[test.id] && (
+                              <Button 
+                                variant="contained" 
+                                size="small" 
+                                sx={{ mt: 2 }}
+                                fullWidth
+                              >
+                                Take Test
+                              </Button>
+                            )}
                           </CardContent>
                         </Card>
                       </Grid>
@@ -1480,7 +2683,7 @@ const StudentDashboard = () => {
                   • Duration: {selectedTest.duration}
                 </Typography>
                 <Typography variant="body2">
-                  • Number of Questions: {selectedTest.questions}
+                  • Number of Questions: {mockTestQuestions[selectedTest.id] ? mockTestQuestions[selectedTest.id].length : selectedTest.questions}
                 </Typography>
                 <Typography variant="body2">
                   • No negative marking
@@ -1502,16 +2705,350 @@ const StudentDashboard = () => {
           </Button>
           <Button 
             variant="contained" 
-            onClick={() => {
-              // Handle test start
-              setOpenTestDialog(false);
-            }}
+            onClick={startTest}
             fullWidth={isMobile}
             size={isMobile ? "small" : "medium"}
+            disabled={!mockTestQuestions[selectedTest?.id]}
           >
             Start Test
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Mock Test Interface */}
+      <Dialog
+        open={testInProgress}
+        fullScreen
+        PaperProps={{
+          style: {
+            backgroundColor: '#f5f5f5',
+            padding: '16px'
+          }
+        }}
+      >
+        <Box sx={{ 
+          p: 2, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          height: '100%',
+          maxWidth: '800px',
+          mx: 'auto'
+        }}>
+          {!testCompleted ? (
+            // Active test UI
+            <>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                mb: 3
+              }}>
+                <Typography variant="h5">
+                  {selectedTest.name}
+                </Typography>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  gap: 2
+                }}>
+                  <Box sx={{ 
+                    bgcolor: 'primary.main', 
+                    color: 'white', 
+                    py: 1, 
+                    px: 2, 
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+                    <AccessTimeIcon fontSize="small" />
+                    <Typography variant="body2">
+                      {formatTime(timeRemaining)}
+                    </Typography>
+                  </Box>
+                  <Button 
+                    variant="contained" 
+                    color="error" 
+                    onClick={completeTest}
+                    size="small"
+                  >
+                    Submit Test
+                  </Button>
+                </Box>
+              </Box>
+
+              <LinearProgress 
+                variant="determinate" 
+                value={(activeQuestion + 1) / (mockTestQuestions[selectedTest?.id]?.length || 1) * 100} 
+                sx={{ mb: 2 }}
+              />
+
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                mb: 1
+              }}>
+                <Typography variant="body2">
+                  Question {activeQuestion + 1} of {mockTestQuestions[selectedTest?.id]?.length || 0}
+                </Typography>
+                <Typography variant="body2">
+                  {Object.keys(selectedAnswers).length} of {mockTestQuestions[selectedTest?.id]?.length || 0} answered
+                </Typography>
+              </Box>
+
+              <Paper sx={{ p: 3, mb: 4, flexGrow: 1 }}>
+                <Typography variant="h6" gutterBottom>
+                  {mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.question || "Question not available"}
+                </Typography>
+                
+                <FormControl component="fieldset" sx={{ width: '100%', mt: 2 }}>
+                  <RadioGroup
+                    value={selectedAnswers[activeQuestion] !== undefined ? selectedAnswers[activeQuestion].toString() : ''}
+                    onChange={(e) => handleAnswerSelect(activeQuestion, parseInt(e.target.value))}
+                  >
+                    {mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.options?.map((option, index) => (
+                      <FormControlLabel
+                        key={index}
+                        value={index.toString()}
+                        control={<Radio />}
+                        label={option}
+                        sx={{ 
+                          display: 'block', 
+                          my: 1, 
+                          p: 1, 
+                          border: '1px solid #e0e0e0',
+                          borderRadius: 1,
+                          bgcolor: showAnswers[activeQuestion] && mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.correctAnswer === index ? 
+                            'rgba(76, 175, 80, 0.1)' : 'transparent',
+                          borderColor: showAnswers[activeQuestion] && mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.correctAnswer === index ? 
+                            'success.main' : '#e0e0e0',
+                          '&:hover': {
+                            bgcolor: 'rgba(0, 0, 0, 0.04)'
+                          }
+                        }}
+                      />
+                    )) || <Typography>No options available</Typography>}
+                  </RadioGroup>
+                </FormControl>
+                
+                {selectedAnswers[activeQuestion] !== undefined && (
+                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => toggleShowAnswer(activeQuestion)}
+                      startIcon={showAnswers[activeQuestion] ? <InfoIcon /> : <InfoIcon />}
+                      size="small"
+                    >
+                      {showAnswers[activeQuestion] ? "Hide Answer" : "Show Answer"}
+                    </Button>
+                  </Box>
+                )}
+                
+                {showAnswers[activeQuestion] && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(76, 175, 80, 0.1)', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+                    <Typography variant="subtitle2" color="success.main">
+                      Correct Answer: {mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.options?.[mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.correctAnswer] || "Not available"}
+                    </Typography>
+                    
+                    {selectedAnswers[activeQuestion] === mockTestQuestions[selectedTest?.id]?.[activeQuestion]?.correctAnswer ? (
+                      <Typography variant="body2" color="success.main" sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+                        <CheckCircleIcon fontSize="small" sx={{ mr: 0.5 }} /> Your answer is correct!
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="error.main" sx={{ mt: 1 }}>
+                        Your answer is incorrect. Consider reviewing this topic.
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Paper>
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Button 
+                  onClick={() => navigateQuestion('prev')} 
+                  disabled={activeQuestion === 0}
+                  startIcon={<ArrowBackIcon />}
+                >
+                  Previous
+                </Button>
+                
+                {activeQuestion < (mockTestQuestions[selectedTest?.id]?.length - 1 || 0) ? (
+                  <Button 
+                    onClick={() => navigateQuestion('next')}
+                    endIcon={<ArrowForwardIcon />}
+                    variant="contained"
+                  >
+                    Next
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={completeTest}
+                    variant="contained" 
+                    color="success"
+                    endIcon={<CheckCircleIcon />}
+                  >
+                    Finish Test
+                  </Button>
+                )}
+              </Box>
+            </>
+          ) : (
+            // Test results UI
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="h4" gutterBottom sx={{ mt: 4 }}>
+                Test Completed!
+              </Typography>
+              
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                my: 4 
+              }}>
+                <Box sx={{ 
+                  position: 'relative', 
+                  display: 'inline-flex',
+                  mb: 3
+                }}>
+                  <CircularProgress 
+                    variant="determinate" 
+                    value={testScore} 
+                    size={120} 
+                    thickness={5}
+                    sx={{
+                      color: testScore >= 70 ? 'success.main' : 
+                             testScore >= 40 ? 'warning.main' : 'error.main'
+                    }}
+                  />
+                  <Box sx={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Typography
+                      variant="h4"
+                      component="div"
+                      color="text.secondary"
+                    >
+                      {`${testScore}%`}
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <Typography variant="h6" gutterBottom>
+                  {testScore >= 70 ? 'Excellent!' : 
+                   testScore >= 40 ? 'Good effort!' : 'Keep practicing!'}
+                </Typography>
+                
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  You answered {Object.keys(selectedAnswers).filter(idx => 
+                    mockTestQuestions[selectedTest?.id]?.[parseInt(idx)]?.correctAnswer === selectedAnswers[parseInt(idx)]
+                  ).length} out of {mockTestQuestions[selectedTest?.id]?.length || 0} questions correctly.
+                </Typography>
+                
+                {/* Answer Review Section */}
+                <Box sx={{ width: '100%', maxWidth: '600px', mb: 4, textAlign: 'left' }}>
+                  <Typography variant="h6" gutterBottom sx={{ mb: 2, textAlign: 'center' }}>
+                    Review Your Answers
+                  </Typography>
+                  
+                  {mockTestQuestions[selectedTest?.id]?.map((question, index) => {
+                    const userAnswer = selectedAnswers[index];
+                    const isCorrect = userAnswer === question.correctAnswer;
+                    const userSelected = userAnswer !== undefined;
+                    
+                    return (
+                      <Paper 
+                        key={index} 
+                        sx={{ 
+                          p: 2, 
+                          mb: 2,
+                          borderLeft: userSelected ? 
+                            (isCorrect ? '4px solid #4caf50' : '4px solid #f44336') : 
+                            '4px solid #ffeb3b'
+                        }}
+                      >
+                        <Typography variant="subtitle1" fontWeight="medium">
+                          Question {index + 1}: {question.question}
+                        </Typography>
+                        
+                        <Box sx={{ mt: 1 }}>
+                          {question.options.map((option, optIdx) => (
+                            <Box 
+                              key={optIdx} 
+                              sx={{ 
+                                p: 1, 
+                                mb: 0.5,
+                                borderRadius: 1,
+                                bgcolor: optIdx === question.correctAnswer ? 
+                                  'rgba(76, 175, 80, 0.1)' : 
+                                  (userAnswer === optIdx && userAnswer !== question.correctAnswer ? 'rgba(244, 67, 54, 0.1)' : 'transparent'),
+                                border: '1px solid',
+                                borderColor: optIdx === question.correctAnswer ? 
+                                  'success.main' : 
+                                  (userAnswer === optIdx && userAnswer !== question.correctAnswer ? 'error.main' : 'divider')
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Typography variant="body2">
+                                  {option}
+                                </Typography>
+                                
+                                {optIdx === question.correctAnswer && (
+                                  <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center' }}>
+                                    <Typography variant="caption" color="success.main" sx={{ mr: 0.5, fontWeight: 'bold' }}>
+                                      CORRECT ANSWER
+                                    </Typography>
+                                    <CheckCircleIcon 
+                                      color="success" 
+                                      fontSize="small"
+                                    />
+                                  </Box>
+                                )}
+                              </Box>
+                            </Box>
+                          ))}
+                        </Box>
+                        
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            mt: 1, 
+                            color: userSelected ? 
+                              (isCorrect ? 'success.main' : 'error.main') : 
+                              'warning.main',
+                            fontWeight: 'medium'
+                          }}
+                        >
+                          {userSelected ? 
+                            (isCorrect ? 'Correct answer!' : `Incorrect answer. The correct answer is: "${question.options[question.correctAnswer]}"`) : 
+                            'No answer selected'}
+                        </Typography>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+                
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    setTestInProgress(false);
+                    setActiveTab(1); // Switch back to mock test tab
+                  }}
+                  sx={{ mt: 2 }}
+                >
+                  Return to Dashboard
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </Box>
       </Dialog>
 
       {/* Add Notification Snackbar at the end of the component before the final closing tag */}

@@ -148,7 +148,7 @@ const CompanyDashboard = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('companyData');
-    navigate('/company/auth');
+    navigate('/');
   };
 
   const handleUpdateProfile = async () => {

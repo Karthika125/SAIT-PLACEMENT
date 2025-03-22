@@ -10,7 +10,8 @@ import {
   Grid
 } from '@mui/material';
 import { supabase } from '../../config/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -122,9 +123,20 @@ const Register = () => {
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: 'background.default' }}>
       <Container component="main" maxWidth="sm">
         <Paper elevation={3} sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography component="h1" variant="h5" gutterBottom>
-            Student Registration
-          </Typography>
+          <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Button
+              component={Link}
+              to="/auth"
+              startIcon={<ArrowBackIcon />}
+              sx={{ color: 'text.secondary' }}
+            >
+              Back
+            </Button>
+            <Typography component="h1" variant="h5">
+              Student Registration
+            </Typography>
+            <Box sx={{ width: 40 }} /> {/* Empty box for alignment */}
+          </Box>
 
           {error && (
             <Alert severity="error" sx={{ mb: 2, width: '100%' }}>

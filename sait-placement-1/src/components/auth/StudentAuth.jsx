@@ -14,6 +14,7 @@ import {
 import { supabase } from '../../config/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
 import { authStyles } from '../../styles/authStyles';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const StudentAuth = () => {
   const navigate = useNavigate();
@@ -83,9 +84,20 @@ const StudentAuth = () => {
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: 'background.default' }}>
       <Container component="main" maxWidth="xs">
         <Paper elevation={3} sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography component="h1" variant="h5" gutterBottom>
-            Welcome Back
-          </Typography>
+          <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Button
+              component={Link}
+              to="/auth"
+              startIcon={<ArrowBackIcon />}
+              sx={{ color: 'text.secondary', alignSelf: 'flex-start' }}
+            >
+              Back
+            </Button>
+            <Typography component="h1" variant="h5">
+              Welcome Back
+            </Typography>
+            <Box sx={{ width: 40 }} /> {/* Empty box for alignment */}
+          </Box>
 
           <ToggleButtonGroup
             color="primary"
