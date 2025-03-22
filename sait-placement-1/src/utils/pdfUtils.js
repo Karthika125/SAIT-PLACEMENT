@@ -1,105 +1,127 @@
-// Load PDF.js from CDN
-let pdfjsLib = null;
-const pdfjsWorkerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+import { normalizeText } from './textUtils';
+import * as pdfjsLib from 'pdfjs-dist';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// Function to load PDF.js script
-const loadPdfJs = () => {
-  return new Promise((resolve, reject) => {
-    if (pdfjsLib) {
-      console.log('PDF.js already loaded');
-      resolve(pdfjsLib);
-      return;
-    }
+// Function to clean and normalize sections
+const normalizeSections = (sections) => {
+  return Object.fromEntries(
+    Object.entries(sections).map(([key, value]) => [key, normalizeText(value)])
+  );
+};
 
-    console.log('Loading PDF.js library...');
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.onload = () => {
-      console.log('PDF.js library loaded successfully');
-      pdfjsLib = window['pdfjs-dist/build/pdf'];
-      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerSrc;
-      resolve(pdfjsLib);
-    };
-    script.onerror = (error) => {
-      console.error('Failed to load PDF.js:', error);
-      reject(new Error('Failed to load PDF processing library. Please try again.'));
-    };
-    document.head.appendChild(script);
-  });
+export const validatePDFFile = (file) => {
+  if (!file || file.type !== 'application/pdf') {
+    throw new Error('Please upload a valid PDF file');
+  }
+  
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    throw new Error('File size must be less than 10MB');
+  }
 };
 
 export const extractTextFromPDF = async (file) => {
   try {
-    console.log('Starting PDF text extraction...');
-    
-    // Ensure PDF.js is loaded
-    console.log('Loading PDF.js...');
-    const pdfjs = await loadPdfJs();
-    console.log('PDF.js loaded successfully');
-    
-    console.log('Reading file contents...');
-    const arrayBuffer = await file.arrayBuffer();
-    console.log('File contents read successfully, size:', arrayBuffer.byteLength);
-    
-    console.log('Loading PDF document...');
-    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-    const pdf = await loadingTask.promise;
-    console.log('PDF document loaded successfully, pages:', pdf.numPages);
-    
-    let fullText = '';
-    
-    console.log('Extracting text from pages...');
-    for (let i = 1; i <= pdf.numPages; i++) {
-      console.log(`Processing page ${i}/${pdf.numPages}...`);
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      console.log(`Page ${i} text length:`, pageText.length);
-      fullText += pageText + ' ';
-    }
-    
-    if (!fullText || fullText.trim().length === 0) {
-      throw new Error('No text content found in the PDF. Please ensure the PDF contains selectable text.');
-    }
-    
-    console.log('Text extraction completed successfully');
-    console.log('Total extracted text length:', fullText.length);
-    console.log('Sample of extracted text:', fullText.substring(0, 100) + '...');
-    
-    return fullText;
+    const sections = {
+      education: '',
+      experience: '',
+      skills: '',
+      projects: '',
+      other: ''
+    };
+
+    const text = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const typedarray = new Uint8Array(e.target.result);
+          const loadingTask = pdfjsLib.getDocument({ data: typedarray });
+          const pdf = await loadingTask.promise;
+          let fullText = '';
+
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            fullText += pageText + ' ';
+
+            // Categorize text into sections
+            const normalizedText = pageText.toLowerCase();
+            if (normalizedText.includes('education') || normalizedText.includes('academic')) {
+              sections.education += pageText + ' ';
+            } else if (normalizedText.includes('experience') || normalizedText.includes('work history')) {
+              sections.experience += pageText + ' ';
+            } else if (normalizedText.includes('skills') || normalizedText.includes('technologies')) {
+              sections.skills += pageText + ' ';
+            } else if (normalizedText.includes('projects') || normalizedText.includes('portfolio')) {
+              sections.projects += pageText + ' ';
+            } else {
+              sections.other += pageText + ' ';
+            }
+          }
+
+          // Normalize sections before returning
+          const normalizedSections = normalizeSections(sections);
+          resolve({ fullText: normalizeText(fullText), sections: normalizedSections });
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+
+    return text;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
-    if (error.message.includes('Invalid PDF structure')) {
-      throw new Error('The PDF file appears to be corrupted. Please try with a different PDF.');
-    } else if (error.name === 'PasswordException') {
-      throw new Error('The PDF is password protected. Please remove the password protection and try again.');
-    } else {
-      throw new Error(`Failed to extract text from PDF: ${error.message}`);
-    }
+    throw new Error('Failed to extract text from PDF. Please ensure the file is not corrupted.');
   }
 };
 
-export const validatePDFFile = (file) => {
-  console.log('Validating PDF file...');
-  console.log('File details:', {
-    name: file.name,
-    type: file.type,
-    size: file.size,
-    lastModified: new Date(file.lastModified).toISOString()
+export const findSkillsInContext = (text, skillSet) => {
+  const foundSkills = new Set();
+  const sentences = text.split(/[.!?]+/);
+
+  // Common skill variations and related terms
+  const skillVariations = {
+    'react': ['reactjs', 'react.js', 'jsx'],
+    'javascript': ['js', 'es6', 'ecmascript'],
+    'typescript': ['ts'],
+    'python': ['py', 'python3'],
+    'java': ['j2ee', 'jvm'],
+    'node': ['nodejs', 'node.js'],
+    'express': ['expressjs', 'express.js'],
+    'mongodb': ['mongo'],
+    'postgresql': ['postgres'],
+    'aws': ['amazon web services', 'ec2', 's3', 'lambda'],
+    'docker': ['containerization', 'containers'],
+    'kubernetes': ['k8s'],
+    'machine learning': ['ml', 'deep learning', 'ai'],
+    'ci/cd': ['continuous integration', 'continuous deployment', 'jenkins', 'github actions']
+  };
+
+  // Check each sentence for skills
+  sentences.forEach(sentence => {
+    const normalizedSentence = normalizeText(sentence);
+    skillSet.forEach(skill => {
+      const skillLower = skill.toLowerCase();
+      
+      // Direct match
+      if (normalizedSentence.includes(skillLower)) {
+        foundSkills.add(skill);
+      }
+      
+      // Check variations
+      const variations = skillVariations[skillLower];
+      if (variations) {
+        variations.forEach(variation => {
+          if (normalizedSentence.includes(variation.toLowerCase())) {
+            foundSkills.add(skill);
+          }
+        });
+      }
+    });
   });
-  
-  if (!file) {
-    throw new Error('No file selected');
-  }
-  
-  if (file.type !== 'application/pdf') {
-    throw new Error('Please upload a PDF file. Other file formats are not supported at the moment.');
-  }
-  
-  if (file.size > 10 * 1024 * 1024) { // 10MB limit
-    throw new Error('File size too large. Please upload a PDF smaller than 10MB.');
-  }
-  
-  console.log('PDF file validation successful');
-  return true;
-}; 
+
+  return Array.from(foundSkills);
+};

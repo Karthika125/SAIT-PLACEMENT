@@ -15,31 +15,28 @@ import {
   Chip,
   AppBar,
   Toolbar,
-  IconButton
+  IconButton,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import BusinessIcon from '@mui/icons-material/Business';
 import WorkIcon from '@mui/icons-material/Work';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { dashboardStyles } from '../../styles/dashboardStyles';
+import { registerCompany } from '../../services/companyService';
 
 const CompanyDashboard = () => {
-  const [jobPostings, setJobPostings] = useState([
-    {
-      title: 'Senior Software Engineer',
-      requirements: ['React', 'Node.js', 'AWS', '5+ years experience'],
-      description: 'Looking for an experienced software engineer to join our team.',
-      location: 'Remote',
-      type: 'Full-time'
-    }
-  ]);
+  const [jobPostings, setJobPostings] = useState([]);
+  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
   const [newPosting, setNewPosting] = useState({
-    title: '',
+    name: '',
+    industry: '',
     requirements: '',
     description: '',
     location: '',
-    type: ''
+    salaryRange: ''
   });
 
   const handleNewPosting = (e) => {
@@ -49,17 +46,39 @@ const CompanyDashboard = () => {
     });
   };
 
-  const handleSubmitPosting = (e) => {
+  const handleSubmitPosting = async (e) => {
     e.preventDefault();
-    const requirements = newPosting.requirements.split(',').map(req => req.trim());
-    setJobPostings([...jobPostings, { ...newPosting, requirements }]);
-    setNewPosting({
-      title: '',
-      requirements: '',
-      description: '',
-      location: '',
-      type: ''
-    });
+    try {
+      const { data, error } = await registerCompany(newPosting);
+      
+      if (error) throw error;
+      
+      setJobPostings([...jobPostings, data[0]]);
+      setNewPosting({
+        name: '',
+        industry: '',
+        requirements: '',
+        description: '',
+        location: '',
+        salaryRange: ''
+      });
+      
+      setNotification({
+        open: true,
+        message: 'Job posting created successfully!',
+        severity: 'success'
+      });
+    } catch (error) {
+      setNotification({
+        open: true,
+        message: error.message || 'Failed to create job posting',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCloseNotification = () => {
+    setNotification({ ...notification, open: false });
   };
 
   return (
@@ -96,37 +115,43 @@ const CompanyDashboard = () => {
           {/* New Job Posting Form */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <AddIcon sx={{ mr: 1, color: 'primary.main' }} />
-                <Typography variant="h6">
-                  Create New Job Posting
-                </Typography>
-              </Box>
-              <Box component="form" onSubmit={handleSubmitPosting}>
+              <Typography variant="h6" gutterBottom>
+                Create New Job Posting
+              </Typography>
+              <form onSubmit={handleSubmitPosting}>
                 <TextField
                   fullWidth
-                  label="Job Title"
-                  name="title"
-                  value={newPosting.title}
+                  label="Company Name"
+                  name="name"
+                  value={newPosting.name}
                   onChange={handleNewPosting}
                   margin="normal"
                   required
-                  sx={{ mb: 2 }}
                 />
                 <TextField
                   fullWidth
-                  label="Requirements (comma-separated)"
+                  label="Industry"
+                  name="industry"
+                  value={newPosting.industry}
+                  onChange={handleNewPosting}
+                  margin="normal"
+                  required
+                />
+                <TextField
+                  fullWidth
+                  label="Job Requirements"
                   name="requirements"
                   value={newPosting.requirements}
                   onChange={handleNewPosting}
                   margin="normal"
                   required
+                  multiline
+                  rows={3}
                   helperText="Enter requirements separated by commas"
-                  sx={{ mb: 2 }}
                 />
                 <TextField
                   fullWidth
-                  label="Description"
+                  label="Job Description"
                   name="description"
                   value={newPosting.description}
                   onChange={handleNewPosting}
@@ -134,7 +159,6 @@ const CompanyDashboard = () => {
                   required
                   multiline
                   rows={4}
-                  sx={{ mb: 2 }}
                 />
                 <TextField
                   fullWidth
@@ -144,27 +168,26 @@ const CompanyDashboard = () => {
                   onChange={handleNewPosting}
                   margin="normal"
                   required
-                  sx={{ mb: 2 }}
                 />
                 <TextField
                   fullWidth
-                  label="Employment Type"
-                  name="type"
-                  value={newPosting.type}
+                  label="Salary Range"
+                  name="salaryRange"
+                  value={newPosting.salaryRange}
                   onChange={handleNewPosting}
                   margin="normal"
                   required
-                  sx={{ mb: 3 }}
                 />
                 <Button
                   type="submit"
                   variant="contained"
-                  startIcon={<AddIcon />}
-                  sx={{ ...dashboardStyles.actionButton, width: '100%' }}
+                  color="primary"
+                  sx={{ mt: 2 }}
+                  fullWidth
                 >
-                  Post Job
+                  Create Job Posting
                 </Button>
-              </Box>
+              </form>
             </Paper>
           </Grid>
 
@@ -184,16 +207,16 @@ const CompanyDashboard = () => {
                       <Card sx={{ width: '100%', ...dashboardStyles.card }}>
                         <CardContent>
                           <Typography variant="h6" gutterBottom>
-                            {posting.title}
+                            {posting.company_name}
                           </Typography>
                           <Typography color="text.secondary" gutterBottom>
-                            {posting.location} • {posting.type}
+                            {posting.location} • {posting.industry}
                           </Typography>
                           <Box sx={dashboardStyles.chipArray}>
-                            {posting.requirements.map((req, i) => (
+                            {posting.job_requirements.split(',').map((req, i) => (
                               <Chip
                                 key={i}
-                                label={req}
+                                label={req.trim()}
                                 size="small"
                                 color="primary"
                                 variant="outlined"
@@ -201,7 +224,10 @@ const CompanyDashboard = () => {
                             ))}
                           </Box>
                           <Typography variant="body2" sx={{ mt: 2 }}>
-                            {posting.description}
+                            {posting.job_description}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Salary Range: {posting.salary_range}
                           </Typography>
                         </CardContent>
                       </Card>
@@ -214,6 +240,16 @@ const CompanyDashboard = () => {
           </Grid>
         </Grid>
       </Container>
+      
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+      >
+        <Alert onClose={handleCloseNotification} severity={notification.severity}>
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
