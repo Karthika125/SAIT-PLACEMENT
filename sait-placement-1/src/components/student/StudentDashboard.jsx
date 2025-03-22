@@ -549,197 +549,206 @@ const StudentDashboard = () => {
         gap: isMobile ? 2 : 0
       }}>
         <Typography variant={isMobile ? "h5" : "h4"}>Student Dashboard</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          component={Link}
-          to="/student/profile"
-          fullWidth={isMobile}
-          size={isMobile ? "small" : "medium"}
-        >
-          My Profile
-        </Button>
       </Box>
-      <Grid container spacing={isMobile ? 2 : 3}>
-        {/* Profile and Resume Section */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: isMobile ? 2 : 3, height: '100%' }}>
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              mb: 3,
-              flexDirection: isMobile ? 'column' : 'row',
-              gap: isMobile ? 1 : 0
-            }}>
-              <AccountCircleIcon sx={{ 
-                fontSize: 40, 
-                mr: isMobile ? 0 : 2, 
-                mb: isMobile ? 1 : 0,
-                color: 'primary.main' 
-              }} />
-              <Typography variant="h5" align={isMobile ? "center" : "left"}>Profile</Typography>
-            </Box>
-            
-            {/* Resume Upload with improved UI */}
-            <Box sx={{ mb: 3 }}>
-              <Card sx={{ 
-                p: 2, 
-                border: '2px dashed #ccc',
-                backgroundColor: '#f8f8f8',
-                transition: 'all 0.3s',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  backgroundColor: '#f0f7ff'
-                }
-              }}>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleResumeUpload}
-                  style={{ display: 'none' }}
-                  id="resume-upload"
-                />
-                <label htmlFor="resume-upload">
-                  <Button
-                    variant="contained"
-                    component="span"
-                    startIcon={<CloudUploadIcon />}
-                    fullWidth
-                    sx={{ mb: 1 }}
-                  >
-                    Upload Resume (PDF)
-                  </Button>
-                </label>
-                <Typography variant="body2" color="text.secondary" align="center">
-                  Max size: 10MB, PDF format only
-                </Typography>
-              </Card>
-              {isAnalyzing && (
-                <Box sx={{ mt: 2 }}>
-                  <LinearProgress />
-                  <Typography variant="body2" color="text.secondary" align="center">
-                    Analyzing Resume...
-                  </Typography>
-                </Box>
-              )}
-            </Box>
 
-            {/* Field Selection with Scores */}
-            {Object.keys(fieldScores).length > 0 && (
-              <Paper sx={{ p: 3, mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Field Compatibility Scores
+      {/* Main Tabs */}
+      <Paper sx={{ mb: 3 }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={(e, newValue) => setActiveTab(newValue)} 
+          variant={isMobile ? "fullWidth" : "standard"}
+          centered
+          sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              py: 2
+            }
+          }}
+        >
+          <Tab 
+            icon={<AssignmentIcon />} 
+            label="Resume & Jobs" 
+            iconPosition="start"
+            sx={{ 
+              minWidth: isMobile ? '0' : '160px',
+              px: isMobile ? 1 : 2
+            }}
+          />
+          <Tab 
+            icon={<QuizIcon />} 
+            label="Mock Tests" 
+            iconPosition="start"
+            sx={{ 
+              minWidth: isMobile ? '0' : '160px',
+              px: isMobile ? 1 : 2
+            }}
+          />
+          <Tab 
+            icon={<AccountCircleIcon />} 
+            label="Profile" 
+            iconPosition="start"
+            sx={{ 
+              minWidth: isMobile ? '0' : '160px',
+              px: isMobile ? 1 : 2
+            }}
+          />
+        </Tabs>
+      </Paper>
+
+      {/* Tab Content */}
+      <Box sx={{ mt: 2 }}>
+        {/* Resume & Jobs Tab */}
+        {activeTab === 0 && (
+          <Grid container spacing={isMobile ? 2 : 3}>
+            {/* Resume Upload Section */}
+            <Grid item xs={12} md={4}>
+              <Paper sx={{ p: isMobile ? 2 : 3, height: '100%', mb: isMobile ? 2 : 0 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  mb: 2,
+                  color: 'primary.main'
+                }}>
+                  <CloudUploadIcon sx={{ mr: 1 }} /> Resume Upload
                 </Typography>
-                <Grid container spacing={2}>
-                  {availableFields.map((field) => (
-                    <Grid item xs={12} key={field}>
-                      <Card 
-                        sx={{ 
-                          cursor: 'pointer',
-                          bgcolor: field === selectedField ? 'primary.light' : 'background.paper',
-                          '&:hover': { bgcolor: 'primary.light' }
-                        }}
-                        onClick={() => handleFieldChange(field)}
+                <Divider sx={{ mb: 2 }} />
+                
+                {/* Resume Upload Card */}
+                <Box sx={{ mb: 3 }}>
+                  <Card sx={{ 
+                    p: 2, 
+                    border: '2px dashed #ccc',
+                    backgroundColor: '#f8f8f8',
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      backgroundColor: '#f0f7ff'
+                    }
+                  }}>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleResumeUpload}
+                      style={{ display: 'none' }}
+                      id="resume-upload"
+                    />
+                    <label htmlFor="resume-upload">
+                      <Button
+                        variant="contained"
+                        component="span"
+                        startIcon={<CloudUploadIcon />}
+                        fullWidth
+                        sx={{ mb: 1 }}
                       >
-                        <CardContent>
-                          <Typography variant="h6">{field}</Typography>
-                          {fieldScores[field] !== undefined && (
-                            <>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={fieldScores[field]} 
-                                sx={{ mt: 1, mb: 0.5 }}
-                              />
-                              <Typography variant="body2" color="text.secondary">
-                                Compatibility: {Math.round(fieldScores[field])}%
-                              </Typography>
-                            </>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Paper>
-            )}
-
-            {/* Resume Analysis */}
-            {resumeAnalysis && (
-              <Box>
-                <Typography variant="h6" gutterBottom>
-                  Resume Analysis
-                </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Detected Skills:
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {resumeAnalysis.skills.map((skill, index) => (
-                      <Chip key={index} label={skill} color="primary" />
-                    ))}
-                  </Box>
-                </Box>
-                {resumeAnalysis.missingEssential.length > 0 && (
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" color="error" gutterBottom>
-                      Missing Essential Skills:
+                        Upload Resume (PDF)
+                      </Button>
+                    </label>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                      Max size: 10MB, PDF format only
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {resumeAnalysis.missingEssential.map((skill, index) => (
-                        <Chip key={index} label={skill} color="error" variant="outlined" />
-                      ))}
-                    </Box>
+                  </Card>
+                </Box>
+
+                {/* Resume File Details */}
+                {resume && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Resume: {resume.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Size: {Math.round(resume.size / 1024)} KB
+                    </Typography>
+                    <LinearProgress 
+                      variant={isAnalyzing ? "indeterminate" : "determinate"} 
+                      value={100}
+                      sx={{ mb: 1 }}
+                    />
+                    {isAnalyzing && (
+                      <Typography variant="body2" align="center">
+                        Analyzing resume...
+                      </Typography>
+                    )}
                   </Box>
                 )}
-              </Box>
-            )}
-          </Paper>
-        </Grid>
 
-        {/* Jobs and Applications Section */}
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: isMobile ? 2 : 3, height: '100%' }}>
-            <Tabs 
-              value={activeTab} 
-              onChange={(e, newValue) => setActiveTab(newValue)} 
-              variant={isMobile ? "fullWidth" : "standard"}
-              sx={{ mb: 3 }}
-            >
-              <Tab 
-                icon={<WorkIcon />} 
-                label={isMobile ? "" : "Job Matches"} 
-                aria-label="Job Matches"
-                sx={{ 
-                  minWidth: isMobile ? '0' : '90px',
-                  px: isMobile ? 1 : 2
-                }}
-              />
-              <Tab 
-                icon={<AssignmentIcon />} 
-                label={isMobile ? "" : "Applications"} 
-                aria-label="Applications"
-                sx={{ 
-                  minWidth: isMobile ? '0' : '90px',
-                  px: isMobile ? 1 : 2
-                }}
-              />
-              <Tab 
-                icon={<QuizIcon />} 
-                label={isMobile ? "" : "Mock Tests"} 
-                aria-label="Mock Tests"
-                sx={{ 
-                  minWidth: isMobile ? '0' : '90px',
-                  px: isMobile ? 1 : 2
-                }}
-              />
-            </Tabs>
+                {/* Field Analysis */}
+                {resumeAnalysis && !isAnalyzing && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Career Field Analysis
+                    </Typography>
+                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                      <InputLabel id="field-select-label">Select Field</InputLabel>
+                      <Select
+                        labelId="field-select-label"
+                        value={selectedField}
+                        label="Select Field"
+                        onChange={(e) => handleFieldChange(e.target.value)}
+                      >
+                        {availableFields.map((field) => (
+                          <MenuItem key={field} value={field}>
+                            {field}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
 
-            {/* Tab Content */}
-            {activeTab === 0 && (
-              <Box>
+                    {/* Field Scores */}
+                    {fieldScores[selectedField] && (
+                      <Box>
+                        <Typography variant="body2" gutterBottom>
+                          Your skills match for {selectedField}:
+                        </Typography>
+                        {Object.entries(fieldScores[selectedField]?.categories || {}).map(([category, score]) => (
+                          <Box key={category} sx={{ mb: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                              <Typography variant="body2">
+                                {category.charAt(0).toUpperCase() + category.slice(1)} Skills
+                              </Typography>
+                              <Typography variant="body2" fontWeight="bold">
+                                {Math.round(score)}%
+                              </Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.round(score)}
+                              color={
+                                score > 75 ? "success" :
+                                score > 50 ? "primary" :
+                                score > 25 ? "warning" : "error"
+                              }
+                              sx={{ height: 8, borderRadius: 4 }}
+                            />
+                          </Box>
+                        ))}
+                        <Box sx={{ mt: 2 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => searchJobsForField(selectedField, fieldScores[selectedField]?.skills || [])}
+                            fullWidth
+                          >
+                            Find Matching Jobs
+                          </Button>
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+              </Paper>
+            </Grid>
+
+            {/* Job Matches Section */}
+            <Grid item xs={12} md={8}>
+              <Paper sx={{ p: isMobile ? 2 : 3, height: '100%' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
-                    Matched Companies ({matchedCompanies.length})
+                  <Typography variant="h6" sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    color: 'primary.main'
+                  }}>
+                    <WorkIcon sx={{ mr: 1 }} /> Job Opportunities
                   </Typography>
                   <Tooltip title="Companies are ranked based on skill match and field relevance">
                     <IconButton size="small" sx={{ ml: 1 }}>
@@ -747,84 +756,93 @@ const StudentDashboard = () => {
                     </IconButton>
                   </Tooltip>
                 </Box>
+                <Divider sx={{ mb: 2 }} />
+
+                {/* Job Search */}
+                <Box sx={{ mb: 3, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 1 }}>
+                  <FormControl fullWidth variant="outlined" size="small">
+                    <InputLabel>Search by Skills</InputLabel>
+                    <Select
+                      value={searchSkills}
+                      onChange={(e) => setSearchSkills(e.target.value)}
+                      label="Search by Skills"
+                    >
+                      <MenuItem value="">All Skills</MenuItem>
+                      <MenuItem value="javascript">JavaScript</MenuItem>
+                      <MenuItem value="python">Python</MenuItem>
+                      <MenuItem value="react">React</MenuItem>
+                      <MenuItem value="nodejs">Node.js</MenuItem>
+                      <MenuItem value="sql">SQL</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <Button
+                    variant="contained"
+                    onClick={() => searchJobsForField(selectedField, [searchSkills])}
+                    disabled={isSearching}
+                    sx={{ minWidth: isMobile ? '100%' : '120px' }}
+                  >
+                    {isSearching ? 'Searching...' : 'Search'}
+                  </Button>
+                </Box>
+
+                {/* List of Matched Companies */}
                 {matchedCompanies.length > 0 ? (
                   <Grid container spacing={2}>
                     {matchedCompanies.map((company, index) => (
-                      <Grid item xs={12} key={index}>
+                      <Grid item xs={12} sm={6} key={index}>
                         <Card 
                           sx={{ 
-                            borderLeft: company.fieldRelevant ? '4px solid #4caf50' : 'none',
-                            '&:hover': { 
+                            height: '100%',
+                            transition: 'all 0.3s',
+                            '&:hover': {
                               boxShadow: 3,
-                              transform: 'translateY(-2px)',
-                              transition: 'all 0.3s'
-                            },
-                            cursor: 'default'
+                              transform: 'translateY(-2px)'
+                            }
                           }}
                         >
                           <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                              <Typography variant="h6">
-                                {company.company_name}
+                            <Typography variant="h6" gutterBottom>
+                              {company.company_name}
+                            </Typography>
+                            <Box sx={{ mb: 1 }}>
+                              <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Match Score: {company.match_score}%
                               </Typography>
-                              <Chip 
-                                label={`${Math.round(company.matchScore)}% Match`}
-                                color={company.matchScore > 70 ? "success" : "primary"}
-                                variant="outlined"
+                              <LinearProgress
+                                variant="determinate"
+                                value={company.match_score}
+                                color={
+                                  company.match_score > 75 ? "success" :
+                                  company.match_score > 50 ? "primary" :
+                                  company.match_score > 25 ? "warning" : "error"
+                                }
+                                sx={{ height: 6, borderRadius: 3 }}
                               />
                             </Box>
-                            <Typography color="text.secondary" gutterBottom>
-                              {company.industry} | {company.location}
+                            <Typography variant="body2" gutterBottom>
+                              <strong>Job:</strong> {company.job_title || 'Software Developer'}
                             </Typography>
-                            <Typography variant="body1" paragraph>
-                              {company.job_description}
+                            <Typography variant="body2" gutterBottom>
+                              {company.job_description?.substring(0, 100)}...
                             </Typography>
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle2" gutterBottom>
-                                Requirements:
-                              </Typography>
-                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {(company.job_requirements || '').split(',').map((req, i) => {
-                                  const isMatched = company.matchedSkills?.includes(req.trim().toLowerCase());
-                                  return (
-                                    <Chip
-                                      key={i}
-                                      label={req.trim()}
-                                      color={isMatched ? "success" : "default"}
-                                      variant={isMatched ? "filled" : "outlined"}
-                                    />
-                                  );
-                                })}
-                              </Box>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="body2">
-                                Salary: {company.salary_range || 'Not specified'}
-                              </Typography>
-                              <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                                <Button
-                                  variant="contained"
-                                  color="primary"
-                                  onClick={(e) => {
-                                    e.stopPropagation(); 
-                                    console.log(`Apply Now clicked for company: ${company.company_name}, ID: ${company.id}`);
-                                    handleApply(company.id, company.company_name);
-                                  }}
-                                  disabled={applicationStatuses[company.id]}
-                                >
-                                  {applicationStatuses[company.id] ? `Applied - ${applicationStatuses[company.id]}` : 'Apply Now'}
-                                </Button>
-                                <Button
-                                  variant="outlined"
-                                  onClick={(e) => {
-                                    e.stopPropagation(); 
-                                    console.log(`Customize Resume clicked for company: ${company.company_name}`);
-                                    handleCustomizeResume(company);
-                                  }}
-                                >
-                                  Customize Resume
-                                </Button>
-                              </Box>
+                            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+                              <Button
+                                size="small"
+                                onClick={() => handleCustomizeResume(company)}
+                                sx={{ mr: 1 }}
+                                variant="outlined"
+                              >
+                                Customize Resume
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="primary"
+                                onClick={() => handleApply(company.id, company.company_name)}
+                                disabled={applicationStatuses[company.id] === 'applied'}
+                              >
+                                {applicationStatuses[company.id] === 'applied' ? 'Applied' : 'Apply'}
+                              </Button>
                             </Box>
                           </CardContent>
                         </Card>
@@ -832,72 +850,254 @@ const StudentDashboard = () => {
                     ))}
                   </Grid>
                 ) : (
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="body1" color="text.secondary" align="center">
                     No matching companies found. Try uploading your resume or adjusting your skills.
                   </Typography>
                 )}
-              </Box>
-            )}
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
 
-            {activeTab === 1 && (
-              <Box>
-                <Typography variant="h6" gutterBottom>
-                  Available Mock Tests
-                </Typography>
-                <Grid container spacing={3}>
-                  {Object.entries(mockTests).map(([category, tests]) => (
-                    <Grid item xs={12} key={category}>
-                      <Typography variant="subtitle1" color="primary" gutterBottom>
-                        {category} Tests
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {tests.map((test) => (
-                          <Grid item xs={12} sm={6} md={4} key={test.id}>
-                            <Card 
-                              sx={{ 
-                                height: '100%',
-                                cursor: 'pointer',
-                                '&:hover': { 
-                                  boxShadow: 3,
-                                  transform: 'translateY(-2px)',
-                                  transition: 'all 0.3s'
-                                }
-                              }}
-                              onClick={() => handleTestSelect(test)}
-                            >
-                              <CardContent>
-                                <Typography variant="h6" gutterBottom>
-                                  {test.name}
-                                </Typography>
-                                <Divider sx={{ my: 1 }} />
-                                <Typography variant="body2" color="text.secondary">
-                                  Duration: {test.duration}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  Questions: {test.questions}
-                                </Typography>
-                              </CardContent>
-                            </Card>
-                          </Grid>
-                        ))}
+        {/* Mock Tests Tab */}
+        {activeTab === 1 && (
+          <Paper sx={{ p: isMobile ? 2 : 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              mb: 2,
+              color: 'primary.main'
+            }}>
+              <QuizIcon sx={{ mr: 1 }} /> Available Mock Tests
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            
+            <Grid container spacing={3}>
+              {Object.entries(mockTests).map(([category, tests]) => (
+                <Grid item xs={12} key={category}>
+                  <Typography variant="subtitle1" color="primary" gutterBottom sx={{ fontWeight: 'bold' }}>
+                    {category} Tests
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {tests.map((test) => (
+                      <Grid item xs={12} sm={6} md={4} key={test.id}>
+                        <Card 
+                          sx={{ 
+                            height: '100%',
+                            cursor: 'pointer',
+                            '&:hover': { 
+                              boxShadow: 3,
+                              transform: 'translateY(-2px)',
+                              transition: 'all 0.3s'
+                            }
+                          }}
+                          onClick={() => handleTestSelect(test)}
+                        >
+                          <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                              {test.name}
+                            </Typography>
+                            <Divider sx={{ my: 1 }} />
+                            <Typography variant="body2" color="text.secondary">
+                              Duration: {test.duration}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Questions: {test.questions}
+                            </Typography>
+                          </CardContent>
+                        </Card>
                       </Grid>
-                    </Grid>
-                  ))}
+                    ))}
+                  </Grid>
                 </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        )}
+
+        {/* Profile Tab */}
+        {activeTab === 2 && (
+          <Paper sx={{ p: isMobile ? 2 : 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              mb: 2,
+              color: 'primary.main'
+            }}>
+              <AccountCircleIcon sx={{ mr: 1 }} /> Student Profile
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            
+            {profile ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
+                        Personal Information
+                      </Typography>
+                      <Divider sx={{ mb: 2 }} />
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Name
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.full_name || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Student ID
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.student_id || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Email
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.email || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Phone
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.phone || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Address
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.address || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={12} md={6}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
+                        Academic Information
+                      </Typography>
+                      <Divider sx={{ mb: 2 }} />
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Program
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.program || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Year Level
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.year_level || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Skills
+                          </Typography>
+                          <Box sx={{ mt: 1 }}>
+                            {(profile.skills || []).length > 0 ? 
+                              profile.skills.map((skill, index) => (
+                                <Chip 
+                                  key={index} 
+                                  label={skill} 
+                                  size="small" 
+                                  sx={{ m: 0.5 }} 
+                                  color="primary" 
+                                  variant="outlined" 
+                                />
+                              )) : 
+                              <Typography variant="body2" color="text.secondary">
+                                No skills added yet
+                              </Typography>
+                            }
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="h6" sx={{ color: 'primary.main' }}>
+                          Academic Records & Applications
+                        </Typography>
+                        <Button 
+                          variant="contained" 
+                          color="primary"
+                          component={Link}
+                          to="/student/profile"
+                        >
+                          Edit Profile
+                        </Button>
+                      </Box>
+                      <Divider sx={{ my: 2 }} />
+                      
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            GPA
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {profile.gpa || 'Not provided'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Total Applications
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {Object.keys(applicationStatuses).length || 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={4}>
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Resume Uploaded
+                          </Typography>
+                          <Typography variant="body1" gutterBottom>
+                            {resume ? 'Yes' : 'No'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="text.secondary" gutterBottom>
+                  Loading profile information...
+                </Typography>
+                <LinearProgress sx={{ mt: 2, mx: 'auto', maxWidth: '60%' }} />
               </Box>
             )}
           </Paper>
-        </Grid>
-      </Grid>
+        )}
+      </Box>
 
-      {/* Company Customize Dialog */}
-      <Dialog
-        open={openCustomizeDialog}
-        onClose={() => setOpenCustomizeDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        fullScreen={isMobile}
-      >
+      {/* Customize Resume Dialog */}
+      <Dialog open={openCustomizeDialog} onClose={() => setOpenCustomizeDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Customize Resume for {selectedCompany?.company_name}</DialogTitle>
         <DialogContent>
           <Typography variant="body1" paragraph>
@@ -951,13 +1151,7 @@ const StudentDashboard = () => {
       </Dialog>
 
       {/* Mock Test Dialog */}
-      <Dialog
-        open={openTestDialog}
-        onClose={() => setOpenTestDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        fullScreen={isMobile}
-      >
+      <Dialog open={openTestDialog} onClose={() => setOpenTestDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Start Mock Test</DialogTitle>
         <DialogContent>
           {selectedTest && (
@@ -1010,7 +1204,7 @@ const StudentDashboard = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Add Notification Snackbar at the end of the component before the final closing tag */}
+      {/* Notifications */}
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}
