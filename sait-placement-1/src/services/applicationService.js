@@ -12,7 +12,7 @@ export const applyToJob = async (companyId) => {
     // Check if student profile exists and is submitted
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('student_id, profile_submitted')
+      .select('*') // Select all fields to check completeness
       .eq('email', user.email)
       .single();
 
@@ -22,7 +22,29 @@ export const applyToJob = async (companyId) => {
     }
     if (!student) throw new Error('Student profile not found');
     console.log(`Student ID: ${student.student_id}, Profile submitted: ${student.profile_submitted}`);
-    if (!student.profile_submitted) throw new Error('Please submit your profile before applying');
+    
+    // Check if profile is complete, even if profile_submitted flag is not set
+    const isProfileComplete = student && student.full_name && student.email && 
+                            student.department && student.phone && 
+                            student.skills && student.skills.length > 0;
+    
+    if (!student.profile_submitted && !isProfileComplete) {
+      throw new Error('Please submit your profile before applying');
+    }
+    
+    // If profile is complete but profile_submitted flag is not set, update it
+    if (isProfileComplete && !student.profile_submitted) {
+      console.log('Profile is complete but flag not set, updating profile_submitted flag');
+      const { error: updateError } = await supabase
+        .from('students')
+        .update({ profile_submitted: true })
+        .eq('student_id', student.student_id);
+        
+      if (updateError) {
+        console.error('Error updating profile_submitted flag:', updateError);
+        // Continue anyway since profile is complete
+      }
+    }
 
     // Check if already applied
     const { data: existingApplication, error: checkError } = await supabase

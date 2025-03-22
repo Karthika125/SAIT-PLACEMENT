@@ -34,6 +34,7 @@ import { useNavigate } from 'react-router-dom';
 import { dashboardStyles } from '../../styles/dashboardStyles';
 import { supabase } from '../../config/supabaseClient';
 import { getCompanyApplications, updateApplicationStatus } from '../../services/applicationService';
+import { updateJobPostingsSchema } from '../../services/updateSchemaService';
 
 const CompanyDashboard = () => {
   const navigate = useNavigate();
@@ -95,6 +96,22 @@ const CompanyDashboard = () => {
         console.log('Company data loaded:', company);
         setCompanyProfile(company);
         setEditedProfile(company);
+
+        // Check and initialize the job_postings table if needed
+        try {
+          const { count, error: checkError } = await supabase
+            .from('job_postings')
+            .select('*', { count: 'exact', head: true })
+            .limit(1);
+            
+          if (checkError && checkError.code === '42P01') {
+            console.log('job_postings table does not exist, initializing...');
+            await updateJobPostingsSchema();
+          }
+        } catch (schemaError) {
+          console.error('Error checking/initializing job_postings schema:', schemaError);
+          // Continue anyway, we'll try again when posting a job
+        }
 
         try {
           // Get job postings - in a separate try/catch to prevent it from affecting other operations
@@ -179,23 +196,80 @@ const CompanyDashboard = () => {
 
   const handleCreateJob = async () => {
     try {
-      const { error } = await supabase
-        .from('job_postings')
-        .insert({
-          ...newPosting,
-          company_name: companyProfile.company_name,
-          posting_date: new Date().toISOString()
-        });
+      console.log('Creating new job posting with data:', {
+        ...newPosting,
+        company_name: companyProfile.company_name,
+        posting_date: new Date().toISOString()
+      });
 
-      if (error) throw error;
+      // Prepare job posting data
+      const jobData = {
+        ...newPosting,
+        company_name: companyProfile.company_name,
+        posting_date: new Date().toISOString()
+      };
+
+      // Add company_id if available
+      if (companyProfile.id) {
+        jobData.company_id = companyProfile.id;
+      }
+
+      // First check if the table exists by querying it
+      const { count, error: checkError } = await supabase
+        .from('job_postings')
+        .select('*', { count: 'exact', head: true })
+        .limit(1);
+
+      // If there's an error, the table might not exist
+      if (checkError) {
+        console.error('Error checking job_postings table:', checkError);
+        
+        // Try to create the table
+        if (checkError.code === '42P01') { // PostgreSQL code for undefined_table
+          console.log('job_postings table does not exist, creating it...');
+          
+          // Update schema to create the table
+          const { success, error: schemaError } = await updateJobPostingsSchema();
+          
+          if (!success) {
+            console.error('Error creating job_postings table:', schemaError);
+            setNotification({
+              open: true,
+              message: 'Job postings feature could not be initialized. Please contact support.',
+              severity: 'error'
+            });
+            return;
+          }
+          
+          console.log('job_postings table created successfully');
+        }
+      }
+
+      // Insert the job posting
+      const { data, error } = await supabase
+        .from('job_postings')
+        .insert(jobData)
+        .select();
+
+      if (error) {
+        console.error('Error inserting job posting:', error);
+        throw error;
+      }
+
+      console.log('Job posting created successfully:', data);
 
       // Refresh job postings
-      const { data: jobs } = await supabase
+      const { data: jobs, error: fetchError } = await supabase
         .from('job_postings')
         .select('*')
         .eq('company_name', companyProfile.company_name);
 
-      setJobPostings(jobs);
+      if (fetchError) {
+        console.error('Error fetching updated job postings:', fetchError);
+      } else {
+        setJobPostings(jobs || []);
+      }
+
       setNewPosting({
         job_requirements: '',
         job_description: '',
@@ -212,7 +286,7 @@ const CompanyDashboard = () => {
       console.error('Error creating job:', error);
       setNotification({
         open: true,
-        message: 'Error creating job posting',
+        message: `Error creating job posting: ${error.message || 'Unknown error'}`,
         severity: 'error'
       });
     }

@@ -60,6 +60,141 @@ import { Link } from 'react-router-dom';
 import { applyToJob, getApplicationStatus, getStudentApplications } from '../../services/applicationService';
 import { updateJobApplicationsSchema } from '../../services/updateSchemaService';
 
+// Dummy alumni data for different companies
+const companyAlumni = {
+  // Default alumni for companies without specific data
+  "default": [
+    {
+      name: "Priya Sharma",
+      graduationYear: "2021",
+      role: "Software Engineer",
+      email: "priya.sharma@gmail.com"
+    },
+    {
+      name: "Rajesh Kumar",
+      graduationYear: "2019",
+      role: "Senior Product Manager",
+      email: "rajesh.kumar@outlook.com"
+    },
+    {
+      name: "Aisha Patel",
+      graduationYear: "2020",
+      role: "Data Scientist",
+      email: "aisha.patel@yahoo.com"
+    }
+  ],
+  
+  // Tech Solutions
+  "Tech Solutions": [
+    {
+      name: "Vikram Mehta",
+      graduationYear: "2018",
+      role: "Full Stack Developer",
+      email: "vikram.mehta@techsolutions.com"
+    },
+    {
+      name: "Anjali Singh",
+      graduationYear: "2020",
+      role: "UX Designer",
+      email: "anjali.singh@gmail.com"
+    },
+    {
+      name: "Nikhil Reddy",
+      graduationYear: "2019",
+      role: "DevOps Engineer",
+      email: "nikhil.reddy@outlook.com"
+    }
+  ],
+  
+  // Global Finance
+  "Global Finance": [
+    {
+      name: "Siddharth Joshi",
+      graduationYear: "2017",
+      role: "Financial Analyst",
+      email: "siddharth.joshi@globalfinance.com"
+    },
+    {
+      name: "Meera Kapoor",
+      graduationYear: "2019",
+      role: "Risk Assessment Specialist",
+      email: "meera.kapoor@yahoo.com"
+    },
+    {
+      name: "Arjun Malhotra",
+      graduationYear: "2020",
+      role: "Investment Banking Associate",
+      email: "arjun.malhotra@gmail.com"
+    }
+  ],
+  
+  // Innovative Systems
+  "Innovative Systems": [
+    {
+      name: "Rahul Verma",
+      graduationYear: "2018",
+      role: "AI Research Scientist",
+      email: "rahul.verma@innovativesystems.com"
+    },
+    {
+      name: "Neha Gupta",
+      graduationYear: "2021",
+      role: "Cloud Solutions Architect",
+      email: "neha.gupta@gmail.com"
+    },
+    {
+      name: "Karan Singhania",
+      graduationYear: "2019",
+      role: "Systems Engineer",
+      email: "karan.singhania@outlook.com"
+    }
+  ],
+  
+  // Data Dynamics
+  "Data Dynamics": [
+    {
+      name: "Lakshmi Narayan",
+      graduationYear: "2020",
+      role: "Data Engineer",
+      email: "lakshmi.narayan@datadynamics.com"
+    },
+    {
+      name: "Vivek Sharma",
+      graduationYear: "2018",
+      role: "Business Intelligence Analyst",
+      email: "vivek.sharma@gmail.com"
+    },
+    {
+      name: "Shreya Kapoor",
+      graduationYear: "2019",
+      role: "Machine Learning Engineer",
+      email: "shreya.kapoor@yahoo.com"
+    }
+  ],
+  
+  // EcoTech Solutions
+  "EcoTech Solutions": [
+    {
+      name: "Rohit Menon",
+      graduationYear: "2017",
+      role: "Sustainability Consultant",
+      email: "rohit.menon@ecotechsolutions.com"
+    },
+    {
+      name: "Deepika Verma",
+      graduationYear: "2020",
+      role: "Environmental Engineer",
+      email: "deepika.verma@gmail.com"
+    },
+    {
+      name: "Ishaan Khanna",
+      graduationYear: "2019",
+      role: "Project Manager",
+      email: "ishaan.khanna@outlook.com"
+    }
+  ]
+};
+
 const StudentDashboard = () => {
   // State for resume handling
   const [resume, setResume] = useState(null);
@@ -1660,7 +1795,8 @@ const StudentDashboard = () => {
           year_of_study: profileFormData.year_of_study,
           cgpa: profileFormData.cgpa,
           phone: profileFormData.phone,
-          skills: profileFormData.skills
+          skills: profileFormData.skills,
+          profile_submitted: true // Explicitly set the profile_submitted flag
         })
         .eq('student_id', profile.student_id);
       
@@ -1669,7 +1805,8 @@ const StudentDashboard = () => {
       // Update local profile state
       setProfile({
         ...profile,
-        ...profileFormData
+        ...profileFormData,
+        profile_submitted: true // Update the local state as well
       });
       
       setIsEditingProfile(false);
@@ -1742,6 +1879,26 @@ const StudentDashboard = () => {
         } else {
           // If profile is actually complete but flag wasn't set, set it now
           setIsProfileValidated(true);
+          
+          // Also update the profile_submitted flag in the database
+          try {
+            const { error } = await supabase
+              .from('students')
+              .update({ profile_submitted: true })
+              .eq('student_id', profile.student_id);
+              
+            if (error) {
+              console.error('Error setting profile_submitted flag:', error);
+            } else {
+              // Update local profile state
+              setProfile({
+                ...profile,
+                profile_submitted: true
+              });
+            }
+          } catch (updateError) {
+            console.error('Exception setting profile_submitted flag:', updateError);
+          }
         }
       }
       
@@ -2637,6 +2794,35 @@ const StudentDashboard = () => {
               </Box>
             </>
           )}
+          
+          {/* Alumni Section */}
+          <Box sx={{ mt: 3, mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+              Connect with Alumni from {selectedCompany?.company_name}
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Reach out to these alumni currently working at {selectedCompany?.company_name} for insights and referrals:
+            </Typography>
+            
+            <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, p: 2, boxShadow: 1 }}>
+              {/* Get alumni data for the selected company or use default if not found */}
+              {(companyAlumni[selectedCompany?.company_name] || companyAlumni.default).map((alumni, index) => (
+                <React.Fragment key={index}>
+                  {index > 0 && <Divider sx={{ my: 1.5 }} />}
+                  <Box sx={{ mb: index < 2 ? 2 : 0 }}>
+                    <Typography variant="subtitle2">{alumni.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Class of {alumni.graduationYear} • {alumni.role}
+                    </Typography>
+                    <Typography variant="body2">
+                      <Box component="span" sx={{ fontWeight: 'medium' }}>Email: </Box>
+                      <Box component="span" sx={{ color: 'primary.main' }}>{alumni.email}</Box>
+                    </Typography>
+                  </Box>
+                </React.Fragment>
+              ))}
+            </Box>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button 

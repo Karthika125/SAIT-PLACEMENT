@@ -92,15 +92,26 @@ const LandingPage = () => {
             />
             SAIT Placement Portal
           </Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            component={Link} 
-            to="/auth"
-            size={isMobile ? "small" : "medium"}
-          >
-            Log In
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              component={Link} 
+              to="/auth"
+              size={isMobile ? "small" : "medium"}
+            >
+              Register
+            </Button>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              component={Link} 
+              to="/auth"
+              size={isMobile ? "small" : "medium"}
+            >
+              Log In
+            </Button>
+          </Box>
         </Toolbar>
       </AppBar>
       <Toolbar /> {/* Spacer for fixed AppBar */}
