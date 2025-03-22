@@ -16,33 +16,53 @@ CREATE TABLE students (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
--- Create companies table
-CREATE TABLE IF NOT EXISTS companies (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Companies table
+CREATE TABLE companies (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    auth_id UUID REFERENCES auth.users(id),
+    email TEXT UNIQUE NOT NULL,
     company_name TEXT NOT NULL,
     industry TEXT NOT NULL,
-    job_requirements TEXT NOT NULL,
-    job_description TEXT NOT NULL,
-    location TEXT NOT NULL,
-    salary_range TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+    verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- Enable Row Level Security (RLS)
+-- Enable Row Level Security
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 
--- Create a policy that allows anyone to read companies data
-CREATE POLICY "Allow public read access" ON companies
-  FOR SELECT USING (true);
+-- Policies for companies table
+CREATE POLICY "Companies can view their own profile"
+ON companies FOR SELECT
+TO authenticated
+USING (auth.uid() = auth_id);
 
--- Create a policy that allows authenticated users to insert companies data
-CREATE POLICY "Allow authenticated users to insert" ON companies
-  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Companies can update their own profile"
+ON companies FOR UPDATE
+TO authenticated
+USING (auth.uid() = auth_id);
 
--- Create a text search index for job requirements
-CREATE INDEX companies_job_requirements_idx ON companies USING GIN(to_tsvector('english', job_requirements));
+CREATE POLICY "Anyone can create a company profile"
+ON companies FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = auth_id);
 
--- Create RLS policies
+-- Function to handle updated_at
+CREATE OR REPLACE FUNCTION handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = TIMEZONE('utc'::text, NOW());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger for updated_at
+CREATE TRIGGER companies_handle_updated_at
+    BEFORE UPDATE ON companies
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_updated_at();
+
+-- Enable Row Level Security (RLS)
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 
 -- Policy for students to view and edit their own data

@@ -35,6 +35,8 @@ import { getStudentProfile } from '../../services/studentService';
 import { searchJobs } from '../../services/companyService';
 import { dashboardStyles } from '../../styles/dashboardStyles';
 import { extractTextFromPDF, validatePDFFile, findSkillsInContext } from '../../utils/pdfUtils';
+import { Link } from 'react-router-dom';
+import { applyToJob, getApplicationStatus } from '../../services/applicationService';
 
 const StudentDashboard = () => {
   // State for resume handling
@@ -67,6 +69,8 @@ const StudentDashboard = () => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const navigate = useNavigate();
+
+  const [applicationStatuses, setApplicationStatuses] = useState({});
 
   useEffect(() => {
     // Get current session
@@ -357,8 +361,52 @@ const StudentDashboard = () => {
     setActiveTab(newValue);
   };
 
+  const handleApply = async (companyId, jobTitle) => {
+    try {
+      await applyToJob(companyId, jobTitle);
+      // Refresh application status
+      const status = await getApplicationStatus(companyId, jobTitle);
+      setApplicationStatuses(prev => ({
+        ...prev,
+        [`${companyId}-${jobTitle}`]: status?.status
+      }));
+      alert('Application submitted successfully!');
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  // Load application statuses when companies are loaded
+  useEffect(() => {
+    const loadApplicationStatuses = async () => {
+      const statuses = {};
+      for (const company of matchedCompanies) {
+        const status = await getApplicationStatus(company.id, company.job_title);
+        if (status) {
+          statuses[`${company.id}-${company.job_title}`] = status.status;
+        }
+      }
+      setApplicationStatuses(statuses);
+    };
+
+    if (matchedCompanies.length > 0) {
+      loadApplicationStatuses();
+    }
+  }, [matchedCompanies]);
+
   return (
     <Box sx={dashboardStyles.root}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4">Student Dashboard</Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          component={Link}
+          to="/student/profile"
+        >
+          My Profile
+        </Button>
+      </Box>
       <Grid container spacing={3}>
         {/* Profile and Resume Section */}
         <Grid item xs={12} md={4}>
@@ -567,12 +615,22 @@ const StudentDashboard = () => {
                               <Typography variant="body2">
                                 Salary: {company.salary_range || 'Not specified'}
                               </Typography>
-                              <Button
-                                variant="outlined"
-                                onClick={() => handleCustomizeResume(company)}
-                              >
-                                Customize Resume
-                              </Button>
+                              <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                                <Button
+                                  variant="contained"
+                                  color="primary"
+                                  onClick={() => handleApply(company.id, company.job_title)}
+                                  disabled={applicationStatuses[`${company.id}-${company.job_title}`] === 'pending'}
+                                >
+                                  {applicationStatuses[`${company.id}-${company.job_title}`] ? `Applied - ${applicationStatuses[`${company.id}-${company.job_title}`]}` : 'Apply Now'}
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  onClick={() => handleCustomizeResume(company)}
+                                >
+                                  Customize Resume
+                                </Button>
+                              </Box>
                             </Box>
                           </CardContent>
                         </Card>

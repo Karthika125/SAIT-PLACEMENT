@@ -2,142 +2,183 @@ import React, { useState } from 'react';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
+  Container,
   TextField,
   Typography,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
+  Paper,
   Alert,
-  CircularProgress,
-  Tabs,
-  Tab,
-  InputAdornment,
-  IconButton
+  Grid,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { registerStudent, loginStudent } from '../../services/studentService';
+import { supabase } from '../../config/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
 const StudentAuth = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Registration form state
-  const [registerForm, setRegisterForm] = useState({
-    student_id: '',
+  const [isLogin, setIsLogin] = useState(true);
+  const [userType, setUserType] = useState('student');
+  const [formData, setFormData] = useState({
     email: '',
     password: '',
-    full_name: '',
-    department: '',
-    year_of_study: '',
-    cgpa: '',
-    phone: ''
+    fullName: '',
+    studentId: '',
+    companyName: '',
+    industry: ''
   });
 
-  // Login form state
-  const [loginForm, setLoginForm] = useState({
-    email: '',
-    password: ''
-  });
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
-  const departments = [
-    'Computer Science',
-    'Information Technology',
-    'Electronics',
-    'Mechanical',
-    'Civil',
-    'Electrical'
-  ];
-
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      // Validate form
-      if (!registerForm.student_id || !registerForm.email || !registerForm.password) {
-        throw new Error('Please fill in all required fields');
-      }
-
-      if (registerForm.password.length < 6) {
-        throw new Error('Password must be at least 6 characters long');
-      }
-
-      console.log('Registering student:', registerForm); // Debug log
-      const { data, error } = await registerStudent(registerForm);
-      console.log('Registration response:', { data, error }); // Debug log
-
-      if (error) throw error;
-
-      // Registration successful
-      navigate('/student/dashboard');
-    } catch (error) {
-      console.error('Registration error:', error); // Debug log
-      setError(error.message);
-    } finally {
-      setLoading(false);
+  const handleUserTypeChange = (event, newType) => {
+    if (newType !== null) {
+      setUserType(newType);
+      setError('');
     }
   };
 
-  const handleLoginSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setLoading(true);
 
     try {
-      console.log('Logging in with:', loginForm); // Debug log
-      const { data, error } = await loginStudent(loginForm.email, loginForm.password);
-      console.log('Login response:', { data, error }); // Debug log
+      if (isLogin) {
+        // Login
+        console.log('Attempting login...');
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
 
-      if (error) throw error;
+        if (error) {
+          console.error('Login error:', error);
+          throw error;
+        }
 
-      // Login successful
-      navigate('/student/dashboard');
+        console.log('Login successful:', data);
+
+        // Check user type in database
+        if (userType === 'student') {
+          const { data: studentData, error: studentError } = await supabase
+            .from('students')
+            .select('*')
+            .eq('email', formData.email)
+            .single();
+            
+          if (studentError) {
+            console.error('Student profile error:', studentError);
+            throw new Error('Error accessing student profile');
+          }
+          
+          navigate('/student/dashboard');
+        } else {
+          const { data: companyData, error: companyError } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('email', formData.email)
+            .single();
+            
+          if (companyError) {
+            console.error('Company profile error:', companyError);
+            throw new Error('Error accessing company profile');
+          }
+          
+          navigate('/company/dashboard');
+        }
+      } else {
+        // Register
+        console.log('Attempting registration...');
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (signUpError) {
+          console.error('Registration error:', signUpError);
+          throw signUpError;
+        }
+
+        if (userType === 'student') {
+          const { error: profileError } = await supabase
+            .from('students')
+            .insert({
+              student_id: formData.studentId,
+              email: formData.email,
+              full_name: formData.fullName
+            });
+
+          if (profileError) {
+            console.error('Student profile creation error:', profileError);
+            throw profileError;
+          }
+          alert('Registration successful! Please verify your email.');
+        } else {
+          const { error: profileError } = await supabase
+            .from('companies')
+            .insert({
+              email: formData.email,
+              company_name: formData.companyName,
+              industry: formData.industry,
+              verified: false
+            });
+
+          if (profileError) {
+            console.error('Company profile creation error:', profileError);
+            throw profileError;
+          }
+          alert('Registration successful! Please wait for admin verification.');
+        }
+        setIsLogin(true);
+      }
     } catch (error) {
-      console.error('Login error:', error); // Debug log
-      setError(error.message);
+      console.error('Authentication error:', error);
+      if (error.message === 'Failed to fetch') {
+        setError('Network error. Please check your internet connection.');
+      } else {
+        setError(error.message || 'An error occurred during authentication');
+      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-    setError('');
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f5f5f5'
-      }}
-    >
-      <Card sx={{ maxWidth: 600, width: '100%', m: 2 }}>
-        <CardContent>
-          <Typography variant="h4" align="center" gutterBottom>
-            Student Portal
+    <Container component="main" maxWidth="sm">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
+          <Typography component="h1" variant="h5" align="center" gutterBottom>
+            SAIT Placement Portal
           </Typography>
 
-          <Tabs
-            value={activeTab}
-            onChange={handleTabChange}
-            centered
-            sx={{ mb: 3 }}
-          >
-            <Tab label="Login" />
-            <Tab label="Register" />
-          </Tabs>
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+            <ToggleButtonGroup
+              value={userType}
+              exclusive
+              onChange={handleUserTypeChange}
+              aria-label="user type"
+            >
+              <ToggleButton value="student" aria-label="student">
+                Student
+              </ToggleButton>
+              <ToggleButton value="company" aria-label="company">
+                Company
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -145,164 +186,113 @@ const StudentAuth = () => {
             </Alert>
           )}
 
-          {/* Login Form */}
-          {activeTab === 0 && (
-            <form onSubmit={handleLoginSubmit}>
-              <TextField
-                label="Email"
-                type="email"
-                fullWidth
-                margin="normal"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                required
-              />
-              <TextField
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                fullWidth
-                margin="normal"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                required
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                sx={{ mt: 2 }}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Login'}
-              </Button>
-            </form>
-          )}
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  required
+                  fullWidth
+                  label="Email Address"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  required
+                  fullWidth
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+              </Grid>
 
-          {/* Registration Form */}
-          {activeTab === 1 && (
-            <form onSubmit={handleRegisterSubmit}>
-              <TextField
-                label="Student ID"
-                fullWidth
-                margin="normal"
-                value={registerForm.student_id}
-                onChange={(e) => setRegisterForm({ ...registerForm, student_id: e.target.value })}
-                required
-                helperText="Enter your SAIT student ID"
-              />
-              <TextField
-                label="Full Name"
-                fullWidth
-                margin="normal"
-                value={registerForm.full_name}
-                onChange={(e) => setRegisterForm({ ...registerForm, full_name: e.target.value })}
-                required
-              />
-              <TextField
-                label="Email"
-                type="email"
-                fullWidth
-                margin="normal"
-                value={registerForm.email}
-                onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                required
-              />
-              <TextField
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                fullWidth
-                margin="normal"
-                value={registerForm.password}
-                onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                required
-                helperText="Minimum 6 characters"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Department</InputLabel>
-                <Select
-                  value={registerForm.department}
-                  onChange={(e) => setRegisterForm({ ...registerForm, department: e.target.value })}
-                  required
+              {!isLogin && (
+                <>
+                  {userType === 'student' ? (
+                    <>
+                      <Grid item xs={12}>
+                        <TextField
+                          required
+                          fullWidth
+                          label="Full Name"
+                          name="fullName"
+                          value={formData.fullName}
+                          onChange={handleChange}
+                        />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          required
+                          fullWidth
+                          label="Student ID"
+                          name="studentId"
+                          value={formData.studentId}
+                          onChange={handleChange}
+                        />
+                      </Grid>
+                    </>
+                  ) : (
+                    <>
+                      <Grid item xs={12}>
+                        <TextField
+                          required
+                          fullWidth
+                          label="Company Name"
+                          name="companyName"
+                          value={formData.companyName}
+                          onChange={handleChange}
+                        />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          required
+                          fullWidth
+                          label="Industry"
+                          name="industry"
+                          value={formData.industry}
+                          onChange={handleChange}
+                        />
+                      </Grid>
+                    </>
+                  )}
+                </>
+              )}
+
+              <Grid item xs={12}>
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  disabled={loading}
                 >
-                  {departments.map((dept) => (
-                    <MenuItem key={dept} value={dept}>
-                      {dept}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Year of Study</InputLabel>
-                <Select
-                  value={registerForm.year_of_study}
-                  onChange={(e) => setRegisterForm({ ...registerForm, year_of_study: e.target.value })}
-                  required
-                >
-                  {[1, 2, 3, 4].map((year) => (
-                    <MenuItem key={year} value={year}>
-                      Year {year}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                label="CGPA"
-                type="number"
-                fullWidth
-                margin="normal"
-                value={registerForm.cgpa}
-                onChange={(e) => setRegisterForm({ ...registerForm, cgpa: e.target.value })}
-                required
-                inputProps={{ step: "0.01", min: "0", max: "10" }}
-              />
-              <TextField
-                label="Phone Number"
-                fullWidth
-                margin="normal"
-                value={registerForm.phone}
-                onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                required
-              />
-              <Button
-                type="submit"
-                variant="contained"
-                fullWidth
-                size="large"
-                sx={{ mt: 2 }}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Register'}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </Box>
+                  {loading
+                    ? 'Please wait...'
+                    : isLogin
+                    ? 'Sign In'
+                    : 'Register'}
+                </Button>
+              </Grid>
+            </Grid>
+          </form>
+
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Button
+              color="primary"
+              onClick={() => setIsLogin(!isLogin)}
+            >
+              {isLogin
+                ? "Don't have an account? Register"
+                : 'Already have an account? Sign In'}
+            </Button>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
 };
 
